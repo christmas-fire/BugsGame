@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
         val buttonRegister = findViewById<Button>(R.id.buttonRegister)
         val calendarView = findViewById<CalendarView>(R.id.calendarView)
         val textViewResult = findViewById<TextView>(R.id.textViewResult)
+        val imageViewZodiac = findViewById<ImageView>(R.id.imageViewZodiac)
 
         val calendar = Calendar.getInstance()
         selectedDay = calendar.get(Calendar.DAY_OF_MONTH)
@@ -45,6 +46,9 @@ class MainActivity : AppCompatActivity() {
             val difficulty = seekBarDifficulty.progress + 1
             val zodiac = getZodiac(selectedMonth, selectedDay)
 
+            val zodiacImageRes = getZodiacImage(selectedMonth, selectedDay)
+            imageViewZodiac.setImageResource(zodiacImageRes)
+
             val resultMessage = "Игрок: $fullName\nПол: $gender\nКурс: $course\nСложность: $difficulty\nЗнак: $zodiac"
 
             textViewResult.text = resultMessage
@@ -68,6 +72,25 @@ class MainActivity : AppCompatActivity() {
             11 -> if (day < 22) "Скорпион" else "Стрелец"
             12 -> if (day < 22) "Стрелец" else "Козерог"
             else -> "Неизвестно"
+        }
+    }
+
+    fun getZodiacImage(month: Int, day: Int): Int {
+        val zodiacName = getZodiac(month, day)
+        return when (zodiacName) {
+            "Козерог" -> R.drawable.zodiac_1
+            "Водолей" -> R.drawable.zodiac_2
+            "Рыбы" -> R.drawable.zodiac_3
+            "Овен" -> R.drawable.zodiac_4
+            "Телец" -> R.drawable.zodiac_5
+            "Близнецы" -> R.drawable.zodiac_6
+            "Рак" -> R.drawable.zodiac_7
+            "Лев" -> R.drawable.zodiac_8
+            "Дева" -> R.drawable.zodiac_9
+            "Весы" -> R.drawable.zodiac_10
+            "Скорпион" -> R.drawable.zodiac_11
+            "Стрелец" -> R.drawable.zodiac_12
+            else -> R.drawable.zodiac_1
         }
     }
 }
