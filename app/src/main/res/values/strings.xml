@@ -1,3 +1,10 @@
 <resources>
     <string name="BugsGame">BugsGame</string>
+
+    <string-array name="course_options">
+        <item>1 курс</item>
+        <item>2 курс</item>
+        <item>3 курс</item>
+        <item>4 курс</item>
+    </string-array>
 </resources>
