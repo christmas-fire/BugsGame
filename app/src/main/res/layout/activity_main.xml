@@ -81,6 +81,25 @@
         android:progress="1"
         android:layout_marginTop="8dp" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Выберите дату рождения:"
+        android:layout_marginTop="16dp" />
+
+    <CalendarView
+        android:id="@+id/calendarView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:id="@+id/textViewResult"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:textSize="16sp"
+        android:textColor="#000000" />
+
     <Button
         android:id="@+id/buttonRegister"
         android:layout_width="match_parent"
