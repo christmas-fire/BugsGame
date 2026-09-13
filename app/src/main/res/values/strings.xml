@@ -7,4 +7,6 @@
         <item>3 курс</item>
         <item>4 курс</item>
     </string-array>
+
+    <string name="difficulty_level">Уровень сложности:</string>
 </resources>

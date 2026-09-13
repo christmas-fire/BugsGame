@@ -7,6 +7,7 @@ import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import android.widget.SeekBar
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -16,6 +17,7 @@ class MainActivity : AppCompatActivity() {
         val editTextFullName = findViewById<EditText>(R.id.editTextFullName)
         val radioGroupGender = findViewById<RadioGroup>(R.id.radioGroupGender)
         val spinnerCourse = findViewById<Spinner>(R.id.spinnerCourse)
+        val seekBarDifficulty = findViewById<SeekBar>(R.id.seekBarDifficulty)
         val buttonRegister = findViewById<Button>(R.id.buttonRegister)
 
         buttonRegister.setOnClickListener {
@@ -31,7 +33,9 @@ class MainActivity : AppCompatActivity() {
 
             val course = spinnerCourse.selectedItem.toString()
 
-            val resultMessage = "Игрок зарегистрирован:\nФИО: $fullName\nПол: $gender\nКурс: $course"
+            val difficulty = seekBarDifficulty.progress + 1
+            val resultMessage = "Игрок зарегистрирован:\nФИО: $fullName\nПол: $gender\nКурс: $course\nСложность: $difficulty"
+
             Toast.makeText(this, resultMessage, Toast.LENGTH_LONG).show()
         }
     }
