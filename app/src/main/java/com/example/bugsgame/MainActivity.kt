@@ -3,6 +3,7 @@ package com.example.bugsgame
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.text.HtmlCompat
 import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
@@ -12,6 +13,23 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val tabHost = findViewById<TabHost>(android.R.id.tabhost)
+        tabHost.setup()
+
+        var tabSpec = tabHost.newTabSpec("tabRegistration")
+        tabSpec.setIndicator(getString(R.string.tab_registration))
+        tabSpec.setContent(R.id.tabRegistration)
+        tabHost.addTab(tabSpec)
+
+        tabSpec = tabHost.newTabSpec("tabRules")
+        tabSpec.setIndicator(getString(R.string.tab_rules))
+        tabSpec.setContent(R.id.tabRules)
+        tabHost.addTab(tabSpec)
+
+        val textViewRules = findViewById<TextView>(R.id.textViewRules)
+        val rawHtmlRules = getString(R.string.game_rules)
+        textViewRules.text = HtmlCompat.fromHtml(rawHtmlRules, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
         val editTextFullName = findViewById<EditText>(R.id.editTextFullName)
         val radioGroupGender = findViewById<RadioGroup>(R.id.radioGroupGender)
