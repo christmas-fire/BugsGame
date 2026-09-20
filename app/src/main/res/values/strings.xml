@@ -24,4 +24,11 @@
         </ul>
         <p><i>Подробные правила и механики подсчета очков будут добавлены на следующем этапе.</i></p>
     ]]></string>
+
+    <string name="tab_settings">Настройки</string>
+    <string name="settings_title">Настройки игры</string>
+    <string name="speed">Скорость игры</string>
+    <string name="max_bugs">Макс. тараканов</string>
+    <string name="bonus_interval">Интервал бонусов (сек)</string>
+    <string name="round_duration">Длительность раунда (сек)</string>
 </resources>

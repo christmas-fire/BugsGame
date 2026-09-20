@@ -63,6 +63,16 @@ class MainActivity : AppCompatActivity() {
         tabSpec.setContent(R.id.tabAuthors)
         tabHost.addTab(tabSpec)
 
+        tabSpec = tabHost.newTabSpec("tabSettings")
+        tabSpec.setIndicator(getString(R.string.tab_settings))
+        tabSpec.setContent(R.id.tabSettings)
+        tabHost.addTab(tabSpec)
+
+        val seekBarSpeed = findViewById<SeekBar>(R.id.seekBarSpeed)
+        val editTextMaxBugs = findViewById<EditText>(R.id.editTextMaxBugs)
+        val editTextBonusInterval = findViewById<EditText>(R.id.editTextBonusInterval)
+        val editTextRoundDuration = findViewById<EditText>(R.id.editTextRoundDuration)
+
         val textViewRules = findViewById<TextView>(R.id.textViewRules)
         val rawHtmlRules = getString(R.string.game_rules)
         textViewRules.text = HtmlCompat.fromHtml(rawHtmlRules, HtmlCompat.FROM_HTML_MODE_LEGACY)

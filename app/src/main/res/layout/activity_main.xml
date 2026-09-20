@@ -9,16 +9,13 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <TabWidget
-            android:id="@android:id/tabs"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
         <FrameLayout
             android:id="@android:id/tabcontent"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
+            <!-- Вкладка Регистрации -->
             <ScrollView
                 android:id="@+id/tabRegistration"
                 android:layout_width="match_parent"
@@ -28,7 +25,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="32dp">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -143,6 +140,7 @@
                 </LinearLayout>
             </ScrollView>
 
+            <!-- Вкладка Правила -->
             <ScrollView
                 android:id="@+id/tabRules"
                 android:layout_width="match_parent"
@@ -164,6 +162,7 @@
                 </LinearLayout>
             </ScrollView>
 
+            <!-- Вкладка Авторы -->
             <LinearLayout
                 android:id="@+id/tabAuthors"
                 android:layout_width="match_parent"
@@ -179,6 +178,47 @@
 
             </LinearLayout>
 
+            <!-- Вкладка Настройки -->
+            <ScrollView
+                android:id="@+id/tabSettings"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Настройки игры"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="16dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Скорость игры" />
+                    <SeekBar android:id="@+id/seekBarSpeed" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Макс. тараканов" />
+                    <EditText android:id="@+id/editTextMaxBugs" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:hint="10"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Интервал бонусов (сек)" />
+                    <EditText android:id="@+id/editTextBonusInterval" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:hint="5"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Длительность раунда (сек)" />
+                    <EditText android:id="@+id/editTextRoundDuration" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:hint="60"/>
+
+                </LinearLayout>
+            </ScrollView>
+
         </FrameLayout>
+
+        <TabWidget
+            android:id="@android:id/tabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
     </LinearLayout>
 </TabHost>
