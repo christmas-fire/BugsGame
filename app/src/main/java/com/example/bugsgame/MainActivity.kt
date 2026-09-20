@@ -1,10 +1,41 @@
 package com.example.bugsgame
 
+import android.content.Context
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
 import java.util.Calendar
+
+data class Author(
+    val name: String,
+    val photoResId: Int
+)
+
+class AuthorAdapter(
+    private val context: Context,
+    private val authors: List<Author>
+) : ArrayAdapter<Author>(context, R.layout.item_author, authors) {
+
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+        val view = convertView ?: LayoutInflater.from(context)
+            .inflate(R.layout.item_author, parent, false)
+
+        val author = getItem(position)
+        val imageViewPhoto = view.findViewById<ImageView>(R.id.imageViewAuthorPhoto)
+        val textViewName = view.findViewById<TextView>(R.id.textViewAuthorName)
+
+        author?.let {
+            textViewName.text = it.name
+            imageViewPhoto.setImageResource(it.photoResId)
+        }
+
+        return view
+    }
+}
 
 class MainActivity : AppCompatActivity() {
     private var selectedDay = 1
@@ -27,9 +58,22 @@ class MainActivity : AppCompatActivity() {
         tabSpec.setContent(R.id.tabRules)
         tabHost.addTab(tabSpec)
 
+        tabSpec = tabHost.newTabSpec("tabAuthors")
+        tabSpec.setIndicator(getString(R.string.tab_authors))
+        tabSpec.setContent(R.id.tabAuthors)
+        tabHost.addTab(tabSpec)
+
         val textViewRules = findViewById<TextView>(R.id.textViewRules)
         val rawHtmlRules = getString(R.string.game_rules)
         textViewRules.text = HtmlCompat.fromHtml(rawHtmlRules, HtmlCompat.FROM_HTML_MODE_LEGACY)
+
+        val authorsList = listOf(
+            Author("Бабешко А.В. ИП-314", R.drawable.cat1),
+            Author("Брунилин С.Д. ИП-314", R.drawable.cat2)
+        )
+
+        val listViewAuthors = findViewById<ListView>(R.id.listViewAuthors)
+        listViewAuthors.adapter = AuthorAdapter(this, authorsList)
 
         val editTextFullName = findViewById<EditText>(R.id.editTextFullName)
         val radioGroupGender = findViewById<RadioGroup>(R.id.radioGroupGender)

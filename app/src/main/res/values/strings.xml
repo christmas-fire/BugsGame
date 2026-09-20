@@ -12,6 +12,7 @@
 
     <string name="tab_registration">Регистрация</string>
     <string name="tab_rules">Правила игры</string>
+    <string name="tab_authors">Авторы</string>
 
     <string name="game_rules"><![CDATA[
         <h2>Правила игры «BugsGame»</h2>
