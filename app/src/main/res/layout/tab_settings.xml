@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tabSettings"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Настройки игры"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Скорость игры" />
+        <SeekBar android:id="@+id/seekBarSpeed" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp"/>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Макс. тараканов" />
+        <EditText android:id="@+id/editTextMaxBugs" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:hint="10"/>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Интервал бонусов (сек)" />
+        <EditText android:id="@+id/editTextBonusInterval" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:hint="5"/>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Длительность раунда (сек)" />
+        <EditText android:id="@+id/editTextRoundDuration" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:hint="60"/>
+    </LinearLayout>
+</ScrollView>
