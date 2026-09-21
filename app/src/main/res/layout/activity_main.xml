@@ -15,7 +15,6 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <!-- Вкладка Регистрации -->
             <ScrollView
                 android:id="@+id/tabRegistration"
                 android:layout_width="match_parent"
@@ -140,7 +139,6 @@
                 </LinearLayout>
             </ScrollView>
 
-            <!-- Вкладка Правила -->
             <ScrollView
                 android:id="@+id/tabRules"
                 android:layout_width="match_parent"
