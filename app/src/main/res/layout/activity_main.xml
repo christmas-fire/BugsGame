@@ -19,6 +19,7 @@
             <include layout="@layout/tab_rules" />
             <include layout="@layout/tab_authors" />
             <include layout="@layout/tab_settings" />
+            <include layout="@layout/tab_game" />
 
         </FrameLayout>
 

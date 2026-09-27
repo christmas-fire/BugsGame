@@ -1,36 +1,53 @@
 package com.example.bugsgame
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
+import androidx.lifecycle.ViewModelProvider
 import com.example.bugsgame.adapter.AuthorAdapter
+import com.example.bugsgame.engine.GameEngine
 import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
+import com.example.bugsgame.view.GameView
+import com.example.bugsgame.viewmodel.GameViewModel
 import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
     private var selectedDay = 1
     private var selectedMonth = 1
 
+    private lateinit var viewModel: GameViewModel
+    private lateinit var gameEngine: GameEngine
+    private val handler = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        viewModel = ViewModelProvider(this).get(GameViewModel::class.java)
+
         setupTabs()
         setupContent()
         setupListeners()
+        setupGame()
     }
 
     private fun setupTabs() {
         val tabHost = findViewById<TabHost>(android.R.id.tabhost)
         tabHost.setup()
-        val tabs = listOf("reg" to R.id.tabRegistration, "rules" to R.id.tabRules, "authors" to R.id.tabAuthors, "settings" to R.id.tabSettings)
-        val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки")
-
+        val tabs = listOf(
+            "reg" to R.id.tabRegistration,
+            "rules" to R.id.tabRules,
+            "authors" to R.id.tabAuthors,
+            "settings" to R.id.tabSettings,
+            "game" to R.id.tabGame
+        )
+        val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки", "Игра")
         tabs.forEachIndexed { i, tab ->
-            val spec = tabHost.newTabSpec(tab.first).setIndicator(titles[i]).setContent(tab.second)
-            tabHost.addTab(spec)
+            tabHost.addTab(tabHost.newTabSpec(tab.first).setIndicator(titles[i]).setContent(tab.second))
         }
     }
 
@@ -42,16 +59,36 @@ class MainActivity : AppCompatActivity() {
         ))
     }
 
+    private fun setupGame() {
+        val gameView = findViewById<GameView>(R.id.gameView)
+        gameEngine = GameEngine(1000, 1000)
+
+        gameView.onBugClick = { x, y ->
+            if (gameEngine.checkHit(x, y)) {
+                viewModel.hitBug()
+            } else {
+                viewModel.missBug()
+            }
+            true
+        }
+
+        val runnable = object : Runnable {
+            override fun run() {
+                gameEngine.spawnBug()
+                gameEngine.updateBugs()
+                gameView.bugs = gameEngine.bugs
+                gameView.invalidate()
+                handler.postDelayed(this, 30)
+            }
+        }
+        handler.post(runnable)
+    }
+
     private fun setupListeners() {
         findViewById<CalendarView>(R.id.calendarView).setOnDateChangeListener { _, _, month, dayOfMonth ->
             selectedDay = dayOfMonth
             selectedMonth = month + 1
         }
-
-        val radioGroupGender = findViewById<RadioGroup>(R.id.radioGroupGender)
-        val spinnerCourse = findViewById<Spinner>(R.id.spinnerCourse)
-        val seekBarDifficulty = findViewById<SeekBar>(R.id.seekBarDifficulty)
-        val textViewResult = findViewById<TextView>(R.id.textViewResult)
 
         findViewById<Button>(R.id.buttonRegister).setOnClickListener {
             val name = findViewById<EditText>(R.id.editTextFullName).text.toString()
@@ -59,17 +96,7 @@ class MainActivity : AppCompatActivity() {
 
             val zodiac = ZodiacHelper.getZodiac(selectedMonth, selectedDay)
             findViewById<ImageView>(R.id.imageViewZodiac).setImageResource(ZodiacHelper.getZodiacImage(selectedMonth, selectedDay))
-            val selectedGenderId = radioGroupGender.checkedRadioButtonId
-            val gender = if (selectedGenderId == R.id.radioMale) "Мужской" else "Женский"
-
-            val course = spinnerCourse.selectedItem.toString()
-            val difficulty = seekBarDifficulty.progress + 1
-
-
-            val resultMessage = "Игрок: $name\nПол: $gender\nКурс: $course\nСложность: $difficulty\nЗнак: $zodiac"
-
-            textViewResult.text = resultMessage
-
+            findViewById<TextView>(R.id.textViewResult).text = "Игрок: $name\nЗнак: $zodiac\nСчет: ${viewModel.score}"
             Toast.makeText(this, "Регистрация успешна!", Toast.LENGTH_SHORT).show()
         }
     }
