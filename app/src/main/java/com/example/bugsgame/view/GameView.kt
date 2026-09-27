@@ -1,6 +1,7 @@
 package com.example.bugsgame.view
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.util.AttributeSet
@@ -10,7 +11,12 @@ import com.example.bugsgame.R
 import com.example.bugsgame.model.Bug
 
 class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
-    private val bugBitmap = BitmapFactory.decodeResource(resources, R.drawable.bug)
+    private val bugSize = 100
+
+    private val bugBitmap: Bitmap = run {
+        val original = BitmapFactory.decodeResource(resources, R.drawable.bug)
+        Bitmap.createScaledBitmap(original, bugSize, bugSize, true)
+    }
 
     var bugs: List<Bug> = emptyList()
     var onBugClick: ((x: Float, y: Float) -> Boolean)? = null
