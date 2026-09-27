@@ -20,4 +20,11 @@
         android:textStyle="bold"
         android:textColor="#FF0000" />
 
+    <Button
+        android:id="@+id/buttonStart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:text="СТАРТ" />
+
 </RelativeLayout>

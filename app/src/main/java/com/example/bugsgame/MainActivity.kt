@@ -3,6 +3,7 @@ package com.example.bugsgame
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.HtmlCompat
@@ -13,7 +14,6 @@ import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
-import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
     private var selectedDay = 1
@@ -46,8 +46,14 @@ class MainActivity : AppCompatActivity() {
             "game" to R.id.tabGame
         )
         val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки", "Игра")
+
         tabs.forEachIndexed { i, tab ->
             tabHost.addTab(tabHost.newTabSpec(tab.first).setIndicator(titles[i]).setContent(tab.second))
+        }
+
+        tabHost.currentTab = viewModel.currentTab
+        tabHost.setOnTabChangedListener { tabId ->
+            viewModel.currentTab = tabHost.currentTab
         }
     }
 
@@ -61,27 +67,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupGame() {
         val gameView = findViewById<GameView>(R.id.gameView)
+        val buttonStart = findViewById<Button>(R.id.buttonStart)
+        val textViewScore = findViewById<TextView>(R.id.textViewScore)
+
         gameEngine = GameEngine(1000, 1000)
 
-        gameView.onBugClick = { x, y ->
-            if (gameEngine.checkHit(x, y)) {
-                viewModel.hitBug()
-            } else {
-                viewModel.missBug()
-            }
-            true
+        buttonStart.setOnClickListener {
+            it.visibility = View.GONE
+            viewModel.gameSpeed = findViewById<SeekBar>(R.id.seekBarSpeed).progress.toFloat() + 1.0f
+            viewModel.maxBugs = findViewById<EditText>(R.id.editTextMaxBugs).text.toString().toIntOrNull() ?: 10
+
+            gameEngine.startGame(viewModel)
         }
 
         val runnable = object : Runnable {
             override fun run() {
-                gameEngine.spawnBug()
-                gameEngine.updateBugs()
-                gameView.bugs = gameEngine.bugs
-                gameView.invalidate()
+                if (buttonStart.visibility == View.GONE) {
+                    gameEngine.spawnBug()
+                    gameEngine.updateBugs(viewModel.gameSpeed)
+                    gameView.bugs = gameEngine.bugs
+                    gameView.invalidate()
+                    textViewScore.text = "Очки: ${viewModel.score}"
+                }
                 handler.postDelayed(this, 30)
             }
         }
         handler.post(runnable)
+
+        gameView.onBugClick = { x, y ->
+            if (buttonStart.visibility == View.GONE) {
+                if (gameEngine.checkHit(x, y)) viewModel.hitBug() else viewModel.missBug()
+                true
+            } else false
+        }
     }
 
     private fun setupListeners() {

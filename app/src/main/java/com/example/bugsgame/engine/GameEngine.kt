@@ -1,21 +1,27 @@
 package com.example.bugsgame.engine
 
 import com.example.bugsgame.model.Bug
+import com.example.bugsgame.viewmodel.GameViewModel
 import java.util.Random
 
 class GameEngine(private val width: Int, private val height: Int) {
     val bugs = mutableListOf<Bug>()
     private val random = Random()
 
-    fun updateBugs() {
-        for (bug in bugs) {
-            bug.x += (random.nextFloat() * 20 - 10)
-            bug.y += (random.nextFloat() * 20 - 10)
+    private var currentSpeed: Float = 1.0f
 
-            if (bug.x < 0) bug.x = 0f
-            if (bug.x > width - bug.size) bug.x = (width - bug.size).toFloat()
-            if (bug.y < 0) bug.y = 0f
-            if (bug.y > height - bug.size) bug.y = (height - bug.size).toFloat()
+    fun startGame(viewModel: GameViewModel) {
+        this.currentSpeed = viewModel.gameSpeed
+        this.bugs.clear()
+    }
+
+    fun updateBugs(speed: Float) {
+        for (bug in bugs) {
+            bug.x += bug.dx * speed
+            bug.y += bug.dy * speed
+
+            if (bug.x <= 0 || bug.x >= width - bug.size) bug.dx *= -1
+            if (bug.y <= 0 || bug.y >= height - bug.size) bug.dy *= -1
         }
     }
 
