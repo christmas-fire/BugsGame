@@ -8,7 +8,8 @@ data class Bug(
     val size: Int,
     var isAlive: Boolean = true,
     var dx: Float = (Random().nextFloat() * 10 - 5),
-    var dy: Float = (Random().nextFloat() * 10 - 5)
+    var dy: Float = (Random().nextFloat() * 10 - 5),
+    val imageName: String = "bug"
 ) {
     fun contains(touchX: Float, touchY: Float): Boolean {
         return touchX >= x && touchX <= x + size && touchY >= y && touchY <= y + size

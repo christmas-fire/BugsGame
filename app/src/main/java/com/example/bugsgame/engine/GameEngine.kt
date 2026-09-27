@@ -8,10 +8,14 @@ class GameEngine(private val width: Int, private val height: Int) {
     val bugs = mutableListOf<Bug>()
     private val random = Random()
 
+    val bugImageNames = listOf("bug", "bug1", "bug2", "bug3")
+
+    var maxBugs: Int = 10
     private var currentSpeed: Float = 1.0f
 
     fun startGame(viewModel: GameViewModel) {
         this.currentSpeed = viewModel.gameSpeed
+        this.maxBugs = viewModel.maxBugs
         this.bugs.clear()
     }
 
@@ -26,11 +30,14 @@ class GameEngine(private val width: Int, private val height: Int) {
     }
 
     fun spawnBug() {
-        if (bugs.size < 10) {
+        if (bugs.size < maxBugs) {
             val size = 100
             val x = random.nextInt(width - size).toFloat()
             val y = random.nextInt(height - size).toFloat()
-            bugs.add(Bug(x, y, size))
+
+            val randomImage = bugImageNames[random.nextInt(bugImageNames.size)]
+
+            bugs.add(Bug(x, y, size, imageName = randomImage))
         }
     }
 
