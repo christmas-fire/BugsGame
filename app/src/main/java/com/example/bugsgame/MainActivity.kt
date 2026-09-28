@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
@@ -17,6 +19,7 @@ import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
+import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
     private var selectedDay = 1
@@ -26,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gameEngine: GameEngine
     private val handler = Handler(Looper.getMainLooper())
     private var lastTickTime = 0L
+    private lateinit var gestureDetector: GestureDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         setupListeners()
         setupGame()
         setupSettings()
+        setupSwipeGestures()
     }
 
     private fun setupTabs() {
@@ -77,15 +82,28 @@ class MainActivity : AppCompatActivity() {
         val gameView = findViewById<GameView>(R.id.gameView)
         val buttonStart = findViewById<Button>(R.id.buttonStart)
         val textViewScore = findViewById<TextView>(R.id.textViewScore)
+        val layoutHeader = findViewById<View>(R.id.layoutHeader)
 
-        gameEngine = GameEngine(1000, 1000)
+        gameEngine = GameEngine()
         gameEngine.maxBugs = viewModel.maxBugs
+
+        gameView.post {
+            val headerHeight = layoutHeader?.height ?: 0
+            if (gameView.width > 0 && gameView.height > 0) {
+                gameEngine.updateSize(gameView.width, gameView.height, headerHeight)
+            }
+        }
 
         textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
         buttonStart.visibility = if (viewModel.isGameRunning) View.GONE else View.VISIBLE
 
         buttonStart.setOnClickListener {
             it.visibility = View.GONE
+
+            val headerHeight = layoutHeader?.height ?: 0
+            if (gameView.width > 0 && gameView.height > 0) {
+                gameEngine.updateSize(gameView.width, gameView.height, headerHeight)
+            }
 
             viewModel.gameSpeed = findViewById<SeekBar>(R.id.seekBarSpeed).progress.toFloat() + 1.0f
             viewModel.maxBugs = findViewById<EditText>(R.id.editTextMaxBugs).text.toString().toIntOrNull() ?: 10
@@ -103,6 +121,14 @@ class MainActivity : AppCompatActivity() {
         val runnable = object : Runnable {
             override fun run() {
                 if (viewModel.isGameRunning) {
+                    val headerHeight = layoutHeader?.height ?: 0
+
+                    if (gameView.width > 0 && gameView.height > 0 &&
+                        (gameEngine.width != gameView.width || gameEngine.height != gameView.height || gameEngine.topOffset != headerHeight)
+                    ) {
+                        gameEngine.updateSize(gameView.width, gameView.height, headerHeight)
+                    }
+
                     val currentTime = System.currentTimeMillis()
 
                     if (currentTime - lastTickTime >= 1000L) {
@@ -135,6 +161,56 @@ class MainActivity : AppCompatActivity() {
                 true
             } else false
         }
+    }
+
+    private fun setupSwipeGestures() {
+        val tabHost = findViewById<TabHost>(android.R.id.tabhost)
+
+        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            private val SWIPE_THRESHOLD = 100
+            private val SWIPE_VELOCITY_THRESHOLD = 100
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (e1 == null) return false
+
+                val diffX = e2.x - e1.x
+                val diffY = e2.y - e1.y
+
+                if (abs(diffX) > abs(diffY) &&
+                    abs(diffX) > SWIPE_THRESHOLD &&
+                    abs(velocityX) > SWIPE_VELOCITY_THRESHOLD
+                ) {
+                    val tabsCount = 5
+
+                    if (tabHost.currentTab == 4 && viewModel.isGameRunning) {
+                        return false
+                    }
+
+                    if (diffX > 0) {
+                        if (tabHost.currentTab > 0) {
+                            tabHost.currentTab -= 1
+                            return true
+                        }
+                    } else {
+                        if (tabHost.currentTab < tabsCount - 1) {
+                            tabHost.currentTab += 1
+                            return true
+                        }
+                    }
+                }
+                return false
+            }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        gestureDetector.onTouchEvent(ev)
+        return super.dispatchTouchEvent(ev)
     }
 
     private fun setupSettings() {

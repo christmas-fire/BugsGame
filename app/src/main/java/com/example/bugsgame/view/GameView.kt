@@ -15,13 +15,11 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
 
     private val bugImageNames = listOf("bug", "bug1", "bug2", "bug3")
 
-    // Дефолтная картинка на случай отсутствия какого-то файла
     private val defaultBitmap: Bitmap = run {
         val original = BitmapFactory.decodeResource(resources, R.drawable.bug)
         Bitmap.createScaledBitmap(original, bugSize, bugSize, true)
     }
 
-    // Загружаем и масштабируем все картинки один раз в карту: "имя_файла" -> Bitmap
     private val bugBitmaps: Map<String, Bitmap> = bugImageNames.associateWith { name ->
         val resName = name.removeSuffix(".png")
         val resId = resources.getIdentifier(resName, "drawable", context.packageName)
@@ -39,7 +37,6 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         for (bug in bugs) {
-            // Никакого рандома при отрисовке! Берем строго закрепленную за жуком картинку
             val bitmap = bugBitmaps[bug.imageName.removeSuffix(".png")] ?: defaultBitmap
             canvas.drawBitmap(bitmap, bug.x, bug.y, null)
         }

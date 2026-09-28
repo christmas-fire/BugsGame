@@ -1,30 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tabGame"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <com.example.bugsgame.view.GameView
-        android:id="@+id/gameView"
+    <LinearLayout
+        android:id="@+id/layoutHeader"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#E0E0E0" />
-
-    <TextView
-        android:id="@+id/textViewScore"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="Очки: 0"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:textColor="#000000" />
+        android:orientation="vertical"
+        android:background="#E8E8E8"
+        android:paddingTop="48dp"
+        android:paddingBottom="12dp"
+        android:gravity="center"
+        android:elevation="4dp">
 
-    <Button
-        android:id="@+id/buttonStart"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:text="СТАРТ" />
+        <TextView
+            android:id="@+id/textViewScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Очки: 0 | Время: 60с"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#222222" />
+    </LinearLayout>
 
-</RelativeLayout>
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.example.bugsgame.view.GameView
+            android:id="@+id/gameView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <Button
+            android:id="@+id/buttonStart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="Старт"
+            android:textSize="20sp" />
+    </FrameLayout>
+
+</LinearLayout>
