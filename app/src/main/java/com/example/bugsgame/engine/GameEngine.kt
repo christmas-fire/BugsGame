@@ -1,21 +1,20 @@
 package com.example.bugsgame.engine
 
 import com.example.bugsgame.model.Bug
+import com.example.bugsgame.model.BugType
 import com.example.bugsgame.viewmodel.GameViewModel
 import java.util.Random
+import kotlin.math.cos
+import kotlin.math.sin
 
 class GameEngine(var width: Int = 1000, var height: Int = 1000) {
     val bugs = mutableListOf<Bug>()
     private val random = Random()
 
-    val bugImageNames = listOf("bug", "bug1", "bug2", "bug3")
-
     var maxBugs: Int = 10
-    private var currentSpeed: Float = 1.0f
-
     var topOffset: Int = 0
 
-    fun updateSize(newWidth: Int, newHeight: Int, newTopOffset: Int = topOffset) {
+    fun updateSize(newWidth: Int, newHeight: Int, newTopOffset: Int = 0) {
         if (newWidth > 0 && newHeight > 0) {
             this.width = newWidth
             this.height = newHeight
@@ -24,15 +23,15 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
     }
 
     fun startGame(viewModel: GameViewModel) {
-        this.currentSpeed = viewModel.gameSpeed
         this.maxBugs = viewModel.maxBugs
         this.bugs.clear()
     }
 
-    fun updateBugs(speed: Float) {
+    fun updateBugs(gameSpeedMultiplier: Float) {
         for (bug in bugs) {
-            bug.x += bug.dx * speed
-            bug.y += bug.dy * speed
+            val totalSpeed = bug.speed * gameSpeedMultiplier
+            bug.x += bug.dx * totalSpeed
+            bug.y += bug.dy * totalSpeed
 
             if (bug.x <= 0) {
                 bug.x = 0f
@@ -54,25 +53,45 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
 
     fun spawnBug() {
         if (bugs.size < maxBugs) {
-            val size = 100
+            val roll = random.nextInt(100)
+            val type = when {
+                roll < 60 -> BugType.COMMON
+                roll < 90 -> BugType.FAST
+                else -> BugType.RARE
+            }
+
+            val size = type.size
             val maxX = (width - size).coerceAtLeast(1)
             val availableHeight = (height - size - topOffset).coerceAtLeast(1)
 
             val x = random.nextInt(maxX).toFloat()
             val y = (random.nextInt(availableHeight) + topOffset).toFloat()
 
-            val randomImage = bugImageNames[random.nextInt(bugImageNames.size)]
-            bugs.add(Bug(x, y, size, imageName = randomImage))
+            val angle = random.nextDouble() * 2 * Math.PI
+            val dx = cos(angle).toFloat()
+            val dy = sin(angle).toFloat()
+
+            bugs.add(
+                Bug(
+                    type = type,
+                    x = x,
+                    y = y,
+                    size = size,
+                    points = type.points,
+                    speed = type.baseSpeed,
+                    dx = dx,
+                    dy = dy
+                )
+            )
         }
     }
 
-    fun checkHit(touchX: Float, touchY: Float): Boolean {
+    fun checkHit(touchX: Float, touchY: Float): Bug? {
         for (i in bugs.indices.reversed()) {
             if (bugs[i].contains(touchX, touchY)) {
-                bugs.removeAt(i)
-                return true
+                return bugs.removeAt(i)
             }
         }
-        return false
+        return null
     }
 }

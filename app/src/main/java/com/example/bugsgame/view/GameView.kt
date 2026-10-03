@@ -2,32 +2,57 @@ package com.example.bugsgame.view
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.drawable.BitmapDrawable
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.content.ContextCompat
 import com.example.bugsgame.R
 import com.example.bugsgame.model.Bug
+import com.example.bugsgame.model.BugType
 
 class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
-    private val bugSize = 100
 
-    private val bugImageNames = listOf("bug", "bug1", "bug2", "bug3")
+    private val dstRect = RectF()
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val defaultBitmap: Bitmap = run {
-        val original = BitmapFactory.decodeResource(resources, R.drawable.bug)
-        Bitmap.createScaledBitmap(original, bugSize, bugSize, true)
+    private val fallbackBitmap: Bitmap by lazy {
+        loadBitmapFromDrawable(R.drawable.bug) ?: Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply {
+            val c = Canvas(this)
+            val p = Paint().apply { color = Color.RED }
+            c.drawCircle(50f, 50f, 40f, p)
+        }
     }
 
-    private val bugBitmaps: Map<String, Bitmap> = bugImageNames.associateWith { name ->
-        val resName = name.removeSuffix(".png")
-        val resId = resources.getIdentifier(resName, "drawable", context.packageName)
-        if (resId != 0) {
-            val original = BitmapFactory.decodeResource(resources, resId)
-            Bitmap.createScaledBitmap(original, bugSize, bugSize, true)
-        } else {
-            defaultBitmap
+    private val bugBitmaps = mutableMapOf<BugType, Bitmap>()
+
+    init {
+        for (type in BugType.values()) {
+            val resId = resources.getIdentifier(type.drawableResName, "drawable", context.packageName)
+            val bitmap = if (resId != 0) loadBitmapFromDrawable(resId) else null
+            bugBitmaps[type] = bitmap ?: fallbackBitmap
+        }
+    }
+
+    private fun loadBitmapFromDrawable(resId: Int): Bitmap? {
+        return try {
+            val drawable = ContextCompat.getDrawable(context, resId) ?: return null
+            if (drawable is BitmapDrawable && drawable.bitmap != null) {
+                return drawable.bitmap
+            }
+            val w = drawable.intrinsicWidth.coerceAtLeast(100)
+            val h = drawable.intrinsicHeight.coerceAtLeast(100)
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            drawable.draw(canvas)
+            bitmap
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -37,8 +62,9 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         for (bug in bugs) {
-            val bitmap = bugBitmaps[bug.imageName.removeSuffix(".png")] ?: defaultBitmap
-            canvas.drawBitmap(bitmap, bug.x, bug.y, null)
+            val bitmap = bugBitmaps[bug.type] ?: fallbackBitmap
+            dstRect.set(bug.x, bug.y, bug.x + bug.size, bug.y + bug.size)
+            canvas.drawBitmap(bitmap, null, dstRect, paint)
         }
     }
 

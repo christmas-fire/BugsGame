@@ -19,6 +19,7 @@ import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
+import java.util.Locale
 import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
@@ -78,19 +79,44 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun startRound() {
+        val gameView = findViewById<GameView>(R.id.gameView)
+        val buttonStart = findViewById<Button>(R.id.buttonStart)
+        val textViewScore = findViewById<TextView>(R.id.textViewScore)
+
+        buttonStart?.visibility = View.GONE
+
+        if (gameView != null && gameView.width > 0 && gameView.height > 0) {
+            gameEngine.updateSize(gameView.width, gameView.height, 0)
+        }
+
+        findViewById<SeekBar?>(R.id.seekBarSpeed)?.let {
+            viewModel.gameSpeed = it.progress.toFloat() + 1.0f
+        }
+        findViewById<EditText?>(R.id.editTextMaxBugs)?.text?.toString()?.toIntOrNull()?.let {
+            if (it > 0) viewModel.maxBugs = it
+        }
+        findViewById<EditText?>(R.id.editTextRoundDuration)?.text?.toString()?.toIntOrNull()?.let {
+            if (it > 0) viewModel.roundDuration = it
+        }
+
+        viewModel.startNewGame()
+        gameEngine.startGame(viewModel)
+        lastTickTime = System.currentTimeMillis()
+        textViewScore?.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+    }
+
     private fun setupGame() {
         val gameView = findViewById<GameView>(R.id.gameView)
         val buttonStart = findViewById<Button>(R.id.buttonStart)
         val textViewScore = findViewById<TextView>(R.id.textViewScore)
-        val layoutHeader = findViewById<View>(R.id.layoutHeader)
 
         gameEngine = GameEngine()
         gameEngine.maxBugs = viewModel.maxBugs
 
         gameView.post {
-            val headerHeight = layoutHeader?.height ?: 0
             if (gameView.width > 0 && gameView.height > 0) {
-                gameEngine.updateSize(gameView.width, gameView.height, headerHeight)
+                gameEngine.updateSize(gameView.width, gameView.height, 0)
             }
         }
 
@@ -98,35 +124,16 @@ class MainActivity : AppCompatActivity() {
         buttonStart.visibility = if (viewModel.isGameRunning) View.GONE else View.VISIBLE
 
         buttonStart.setOnClickListener {
-            it.visibility = View.GONE
-
-            val headerHeight = layoutHeader?.height ?: 0
-            if (gameView.width > 0 && gameView.height > 0) {
-                gameEngine.updateSize(gameView.width, gameView.height, headerHeight)
-            }
-
-            viewModel.gameSpeed = findViewById<SeekBar>(R.id.seekBarSpeed).progress.toFloat() + 1.0f
-            viewModel.maxBugs = findViewById<EditText>(R.id.editTextMaxBugs).text.toString().toIntOrNull() ?: 10
-            viewModel.roundDuration = findViewById<EditText>(R.id.editTextRoundDuration).text.toString().toIntOrNull() ?: 60
-
-            viewModel.score = 0
-            viewModel.remainingTime = viewModel.roundDuration
-            viewModel.isGameRunning = true
-
-            gameEngine.startGame(viewModel)
-            lastTickTime = System.currentTimeMillis()
-            textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+            startRound()
         }
 
         val runnable = object : Runnable {
             override fun run() {
                 if (viewModel.isGameRunning) {
-                    val headerHeight = layoutHeader?.height ?: 0
-
                     if (gameView.width > 0 && gameView.height > 0 &&
-                        (gameEngine.width != gameView.width || gameEngine.height != gameView.height || gameEngine.topOffset != headerHeight)
+                        (gameEngine.width != gameView.width || gameEngine.height != gameView.height)
                     ) {
-                        gameEngine.updateSize(gameView.width, gameView.height, headerHeight)
+                        gameEngine.updateSize(gameView.width, gameView.height, 0)
                     }
 
                     val currentTime = System.currentTimeMillis()
@@ -143,7 +150,7 @@ class MainActivity : AppCompatActivity() {
                     if (viewModel.isGameRunning) {
                         gameEngine.spawnBug()
                         gameEngine.updateBugs(viewModel.gameSpeed)
-                        gameView.bugs = gameEngine.bugs
+                        gameView.bugs = ArrayList(gameEngine.bugs)
                         gameView.invalidate()
                         textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
                     }
@@ -156,11 +163,46 @@ class MainActivity : AppCompatActivity() {
 
         gameView.onBugClick = { x, y ->
             if (viewModel.isGameRunning) {
-                if (gameEngine.checkHit(x, y)) viewModel.hitBug() else viewModel.missBug()
+                val hitBug = gameEngine.checkHit(x, y)
+                if (hitBug != null) {
+                    viewModel.hitBug(hitBug.points)
+                } else {
+                    viewModel.missBug()
+                }
                 textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
                 true
             } else false
         }
+    }
+
+    private fun onGameOver() {
+        viewModel.isGameRunning = false
+        gameEngine.bugs.clear()
+        val gameView = findViewById<GameView>(R.id.gameView)
+        gameView.bugs = emptyList()
+        gameView.invalidate()
+
+        findViewById<Button>(R.id.buttonStart).visibility = View.VISIBLE
+        findViewById<TextView>(R.id.textViewScore).text = "Игра окончена! Очки: ${viewModel.score}"
+
+        val message = """
+            Раунд завершен!
+            
+            Итоговые очки: ${viewModel.score}
+            Попадания: ${viewModel.hits}
+            Промахи: ${viewModel.misses}
+            Точность: ${String.format(Locale.getDefault(), "%.1f%%", viewModel.accuracy)}
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("Время вышло!")
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton("Играть снова") { _, _ ->
+                startRound()
+            }
+            .setNegativeButton("Закрыть", null)
+            .show()
     }
 
     private fun setupSwipeGestures() {
@@ -218,15 +260,15 @@ class MainActivity : AppCompatActivity() {
         val editTextMaxBugs = findViewById<EditText>(R.id.editTextMaxBugs)
         val editTextRoundDuration = findViewById<EditText>(R.id.editTextRoundDuration)
 
-        seekBarSpeed.progress = (viewModel.gameSpeed - 1.0f).toInt().coerceAtLeast(0)
-        if (editTextMaxBugs.text.isNullOrEmpty()) {
-            editTextMaxBugs.setText(viewModel.maxBugs.toString())
+        seekBarSpeed?.progress = (viewModel.gameSpeed - 1.0f).toInt().coerceAtLeast(0)
+        if (editTextMaxBugs?.text.isNullOrEmpty()) {
+            editTextMaxBugs?.setText(viewModel.maxBugs.toString())
         }
-        if (editTextRoundDuration.text.isNullOrEmpty()) {
-            editTextRoundDuration.setText(viewModel.roundDuration.toString())
+        if (editTextRoundDuration?.text.isNullOrEmpty()) {
+            editTextRoundDuration?.setText(viewModel.roundDuration.toString())
         }
 
-        seekBarSpeed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        seekBarSpeed?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     viewModel.gameSpeed = progress.toFloat() + 1.0f
@@ -237,7 +279,7 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        editTextMaxBugs.addTextChangedListener(object : TextWatcher {
+        editTextMaxBugs?.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
@@ -252,7 +294,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        editTextRoundDuration.addTextChangedListener(object : TextWatcher {
+        editTextRoundDuration?.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
@@ -267,36 +309,17 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun onGameOver() {
-        viewModel.isGameRunning = false
-        gameEngine.bugs.clear()
-        val gameView = findViewById<GameView>(R.id.gameView)
-        gameView.bugs = emptyList()
-        gameView.invalidate()
-
-        findViewById<Button>(R.id.buttonStart).visibility = View.VISIBLE
-        findViewById<TextView>(R.id.textViewScore).text = "Игра окончена! Очки: ${viewModel.score}"
-
-        AlertDialog.Builder(this)
-            .setTitle("Время вышло!")
-            .setMessage("Раунд завершен.\nВаш итоговый счет: ${viewModel.score}")
-            .setPositiveButton("ОК", null)
-            .show()
-    }
-
     private fun resetGameState() {
-        viewModel.score = 0
-        viewModel.remainingTime = viewModel.roundDuration
-        viewModel.isGameRunning = false
+        viewModel.resetGame()
 
-        findViewById<Button>(R.id.buttonStart).visibility = View.VISIBLE
-        findViewById<TextView>(R.id.textViewScore).text = "Очки: 0 | Время: ${viewModel.roundDuration}с"
+        findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
+        findViewById<TextView?>(R.id.textViewScore)?.text = "Очки: 0 | Время: ${viewModel.roundDuration}с"
 
         if (::gameEngine.isInitialized) {
             gameEngine.bugs.clear()
             gameEngine.maxBugs = viewModel.maxBugs
         }
-        val gameView = findViewById<GameView>(R.id.gameView)
+        val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
         gameView?.invalidate()
     }
