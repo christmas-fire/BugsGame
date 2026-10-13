@@ -20,18 +20,13 @@ import androidx.lifecycle.lifecycleScope
 import com.example.bugsgame.adapter.AuthorAdapter
 import com.example.bugsgame.adapter.RecordAdapter
 import com.example.bugsgame.data.AppDatabase
-import com.example.bugsgame.data.ScoreRecord
-import com.example.bugsgame.data.User
+import com.example.bugsgame.data.GameRepository
 import com.example.bugsgame.engine.GameEngine
 import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
@@ -41,7 +36,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var viewModel: GameViewModel
     private lateinit var gameEngine: GameEngine
-    private lateinit var database: AppDatabase
+    private lateinit var repository: GameRepository
     private val handler = Handler(Looper.getMainLooper())
     private var lastTickTime = 0L
     private lateinit var gestureDetector: GestureDetector
@@ -53,7 +48,9 @@ class MainActivity : AppCompatActivity() {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        database = AppDatabase.getInstance(this)
+        val database = AppDatabase.getInstance(this)
+        repository = GameRepository(database)
+
         viewModel = ViewModelProvider(this).get(GameViewModel::class.java)
 
         setupTabs()
@@ -224,26 +221,23 @@ class MainActivity : AppCompatActivity() {
     private fun onGameOver() {
         viewModel.isGameRunning = false
         gameEngine.bugs.clear()
-        val gameView = findViewById<GameView?>(R.id.gameView)
+        val gameView = findViewById<GameView>(R.id.gameView)
         gameView?.bugs = emptyList()
         gameView?.invalidate()
 
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
         findViewById<TextView?>(R.id.textViewScore)?.text = "Игра окончена! Очки: ${viewModel.score}"
 
-        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
-        val record = ScoreRecord(
-            userName = viewModel.currentUserName,
-            score = viewModel.score,
-            difficulty = viewModel.difficultyName,
-            hits = viewModel.hits,
-            misses = viewModel.misses,
-            accuracy = viewModel.accuracy,
-            date = dateFormat.format(Date())
-        )
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            database.scoreRecordDao().insertRecord(record)
+        lifecycleScope.launch {
+            repository.saveGameSession(
+                playerName = viewModel.currentUserName,
+                playerZodiac = viewModel.currentUserZodiac,
+                score = viewModel.score,
+                difficulty = viewModel.difficultyName,
+                hits = viewModel.hits,
+                misses = viewModel.misses,
+                durationSeconds = viewModel.roundDuration
+            )
         }
 
         val message = """
@@ -269,79 +263,51 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadRecords() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val records = database.scoreRecordDao().getAllRecords()
-            withContext(Dispatchers.Main) {
-                val listView = findViewById<ListView?>(R.id.listViewRecords)
-                val emptyView = findViewById<TextView?>(R.id.textViewEmptyRecords)
-                if (records.isEmpty()) {
-                    emptyView?.visibility = View.VISIBLE
-                    listView?.visibility = View.GONE
-                } else {
-                    emptyView?.visibility = View.GONE
-                    listView?.visibility = View.VISIBLE
-                    listView?.adapter = RecordAdapter(this@MainActivity, records)
-                }
+        lifecycleScope.launch {
+            val records = repository.getTopRecords()
+            val listView = findViewById<ListView?>(R.id.listViewRecords)
+            val emptyView = findViewById<TextView?>(R.id.textViewEmptyRecords)
+            if (records.isEmpty()) {
+                emptyView?.visibility = View.VISIBLE
+                listView?.visibility = View.GONE
+            } else {
+                emptyView?.visibility = View.GONE
+                listView?.visibility = View.VISIBLE
+                listView?.adapter = RecordAdapter(this@MainActivity, records)
             }
         }
     }
 
     private fun showSelectUserDialog() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val users = database.userDao().getAllUsers()
-            withContext(Dispatchers.Main) {
-                if (users.isEmpty()) {
-                    Toast.makeText(this@MainActivity, "Нет зарегистрированных игроков", Toast.LENGTH_SHORT).show()
-                    return@withContext
-                }
-
-                val userNames = users.map { "${it.name} (${it.zodiac})" }.toTypedArray()
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Выберите игрока")
-                    .setItems(userNames) { _, which ->
-                        val selectedUser = users[which]
-                        viewModel.currentUserName = selectedUser.name
-                        viewModel.currentUserZodiac = selectedUser.zodiac
-                        updateGameHeader()
-                        Toast.makeText(this@MainActivity, "Текущий игрок: ${selectedUser.name}", Toast.LENGTH_SHORT).show()
-                    }
-                    .setNegativeButton("Отмена", null)
-                    .show()
+        lifecycleScope.launch {
+            val players = repository.getAllPlayers()
+            if (players.isEmpty()) {
+                Toast.makeText(this@MainActivity, "Нет зарегистрированных игроков", Toast.LENGTH_SHORT).show()
+                return@launch
             }
+
+            val names = players.map { "${it.name} (${it.zodiac})" }.toTypedArray()
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Выберите игрока")
+                .setItems(names) { _, which ->
+                    val selected = players[which]
+                    viewModel.currentUserName = selected.name
+                    viewModel.currentUserZodiac = selected.zodiac
+                    updateGameHeader()
+                    Toast.makeText(this@MainActivity, "Текущий игрок: ${selected.name}", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Отмена", null)
+                .show()
         }
     }
 
-    private fun showNewUserDialog() {
-        val input = EditText(this)
-        input.hint = "Введите имя игрока"
-
-        AlertDialog.Builder(this)
-            .setTitle("Регистрация нового игрока")
-            .setView(input)
-            .setPositiveButton("Создать") { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isNotEmpty()) {
-                    registerUser(name, "Не указан")
-                } else {
-                    Toast.makeText(this, "Имя не может быть пустым", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
     private fun registerUser(name: String, zodiac: String) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val existing = database.userDao().getUserByName(name)
-            if (existing == null) {
-                database.userDao().insertUser(User(name = name, zodiac = zodiac))
-            }
-            withContext(Dispatchers.Main) {
-                viewModel.currentUserName = name
-                viewModel.currentUserZodiac = zodiac
-                updateGameHeader()
-                Toast.makeText(this@MainActivity, "Игрок '$name' активирован!", Toast.LENGTH_SHORT).show()
-            }
+        lifecycleScope.launch {
+            val player = repository.registerOrGetPlayer(name, zodiac)
+            viewModel.currentUserName = player.name
+            viewModel.currentUserZodiac = player.zodiac
+            updateGameHeader()
+            Toast.makeText(this@MainActivity, "Игрок '${player.name}' активирован!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -365,7 +331,6 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.textViewResult).text =
                 "Игрок: $name\nЗнак: $zodiac\nСчет: ${viewModel.score}"
 
-            // Сохраняем в Room и активируем игрока
             registerUser(name, zodiac)
         }
     }

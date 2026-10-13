@@ -7,11 +7,15 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.TextView
 import com.example.bugsgame.R
-import com.example.bugsgame.data.ScoreRecord
+import com.example.bugsgame.data.RecordDisplayItem
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
-class RecordAdapter(context: Context, private val records: List<ScoreRecord>) :
-    ArrayAdapter<ScoreRecord>(context, R.layout.item_record, records) {
+class RecordAdapter(context: Context, private val records: List<RecordDisplayItem>) :
+    ArrayAdapter<RecordDisplayItem>(context, R.layout.item_record, records) {
+
+    private val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_record, parent, false)
@@ -23,11 +27,13 @@ class RecordAdapter(context: Context, private val records: List<ScoreRecord>) :
         val textAccuracy = view.findViewById<TextView>(R.id.textRecordAccuracy)
         val textDate = view.findViewById<TextView>(R.id.textRecordDate)
 
-        textName.text = "${position + 1}. ${record.userName}"
+        val zodiacSuffix = if (record.playerZodiac.isNotBlank()) " (${record.playerZodiac})" else ""
+        textName.text = "${position + 1}. ${record.playerName}$zodiacSuffix"
         textScore.text = "${record.score} очк."
         textDifficulty.text = "Сложность: ${record.difficulty}"
         textAccuracy.text = String.format(Locale.getDefault(), "Точность: %.1f%%", record.accuracy)
-        textDate.text = record.date
+
+        textDate.text = dateFormat.format(Date(record.finishedAtEpochMillis))
 
         return view
     }
