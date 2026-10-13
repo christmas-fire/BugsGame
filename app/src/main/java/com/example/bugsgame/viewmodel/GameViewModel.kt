@@ -3,6 +3,9 @@ package com.example.bugsgame.viewmodel
 import androidx.lifecycle.ViewModel
 
 class GameViewModel : ViewModel() {
+    var currentUserName: String = "Гость"
+    var currentUserZodiac: String = ""
+
     var score = 0
     var hits = 0
     var misses = 0
@@ -20,6 +23,13 @@ class GameViewModel : ViewModel() {
         get() {
             val total = hits + misses
             return if (total > 0) (hits.toFloat() / total) * 100f else 0f
+        }
+
+    val difficultyName: String
+        get() = when {
+            gameSpeed <= 1.5f -> "Легкий"
+            gameSpeed <= 3.0f -> "Средний"
+            else -> "Сложный"
         }
 
     fun hitBug(points: Int) {

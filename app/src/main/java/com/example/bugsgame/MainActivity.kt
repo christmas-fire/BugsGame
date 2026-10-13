@@ -6,19 +6,32 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.GestureDetector
+import android.view.Menu
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.core.text.HtmlCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.example.bugsgame.adapter.AuthorAdapter
+import com.example.bugsgame.adapter.RecordAdapter
+import com.example.bugsgame.data.AppDatabase
+import com.example.bugsgame.data.ScoreRecord
+import com.example.bugsgame.data.User
 import com.example.bugsgame.engine.GameEngine
 import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
@@ -28,6 +41,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var viewModel: GameViewModel
     private lateinit var gameEngine: GameEngine
+    private lateinit var database: AppDatabase
     private val handler = Handler(Looper.getMainLooper())
     private var lastTickTime = 0L
     private lateinit var gestureDetector: GestureDetector
@@ -36,6 +50,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
+        database = AppDatabase.getInstance(this)
         viewModel = ViewModelProvider(this).get(GameViewModel::class.java)
 
         setupTabs()
@@ -46,6 +64,21 @@ class MainActivity : AppCompatActivity() {
         setupSwipeGestures()
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_select_user -> {
+                showSelectUserDialog()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
     private fun setupTabs() {
         val tabHost = findViewById<TabHost>(android.R.id.tabhost)
         tabHost.setup()
@@ -54,9 +87,10 @@ class MainActivity : AppCompatActivity() {
             "rules" to R.id.tabRules,
             "authors" to R.id.tabAuthors,
             "settings" to R.id.tabSettings,
-            "game" to R.id.tabGame
+            "game" to R.id.tabGame,
+            "records" to R.id.tabRecords
         )
-        val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки", "Игра")
+        val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки", "Игра", "Рекорды")
 
         tabs.forEachIndexed { i, tab ->
             tabHost.addTab(tabHost.newTabSpec(tab.first).setIndicator(titles[i]).setContent(tab.second))
@@ -65,6 +99,9 @@ class MainActivity : AppCompatActivity() {
         tabHost.currentTab = viewModel.currentTab
         tabHost.setOnTabChangedListener {
             viewModel.currentTab = tabHost.currentTab
+            if (tabHost.currentTab == 5) {
+                loadRecords()
+            }
         }
     }
 
@@ -79,10 +116,14 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun updateGameHeader() {
+        val textViewScore = findViewById<TextView?>(R.id.textViewScore)
+        textViewScore?.text = "Игрок: ${viewModel.currentUserName} | Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+    }
+
     private fun startRound() {
-        val gameView = findViewById<GameView>(R.id.gameView)
-        val buttonStart = findViewById<Button>(R.id.buttonStart)
-        val textViewScore = findViewById<TextView>(R.id.textViewScore)
+        val gameView = findViewById<GameView?>(R.id.gameView)
+        val buttonStart = findViewById<Button?>(R.id.buttonStart)
 
         buttonStart?.visibility = View.GONE
 
@@ -103,33 +144,38 @@ class MainActivity : AppCompatActivity() {
         viewModel.startNewGame()
         gameEngine.startGame(viewModel)
         lastTickTime = System.currentTimeMillis()
-        textViewScore?.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+        updateGameHeader()
     }
 
     private fun setupGame() {
-        val gameView = findViewById<GameView>(R.id.gameView)
-        val buttonStart = findViewById<Button>(R.id.buttonStart)
-        val textViewScore = findViewById<TextView>(R.id.textViewScore)
+        val gameView = findViewById<GameView?>(R.id.gameView)
+        val buttonStart = findViewById<Button?>(R.id.buttonStart)
 
         gameEngine = GameEngine()
         gameEngine.maxBugs = viewModel.maxBugs
 
-        gameView.post {
+        gameView?.post {
             if (gameView.width > 0 && gameView.height > 0) {
                 gameEngine.updateSize(gameView.width, gameView.height, 0)
             }
         }
 
-        textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
-        buttonStart.visibility = if (viewModel.isGameRunning) View.GONE else View.VISIBLE
+        updateGameHeader()
+        buttonStart?.visibility = if (viewModel.isGameRunning) View.GONE else View.VISIBLE
 
-        buttonStart.setOnClickListener {
+        buttonStart?.setOnClickListener {
             startRound()
+        }
+
+        findViewById<View?>(R.id.layoutHeader)?.setOnClickListener {
+            if (!viewModel.isGameRunning) {
+                showSelectUserDialog()
+            }
         }
 
         val runnable = object : Runnable {
             override fun run() {
-                if (viewModel.isGameRunning) {
+                if (viewModel.isGameRunning && gameView != null) {
                     if (gameView.width > 0 && gameView.height > 0 &&
                         (gameEngine.width != gameView.width || gameEngine.height != gameView.height)
                     ) {
@@ -152,7 +198,7 @@ class MainActivity : AppCompatActivity() {
                         gameEngine.updateBugs(viewModel.gameSpeed)
                         gameView.bugs = ArrayList(gameEngine.bugs)
                         gameView.invalidate()
-                        textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+                        updateGameHeader()
                     }
                 }
 
@@ -161,7 +207,7 @@ class MainActivity : AppCompatActivity() {
         }
         handler.post(runnable)
 
-        gameView.onBugClick = { x, y ->
+        gameView?.onBugClick = { x, y ->
             if (viewModel.isGameRunning) {
                 val hitBug = gameEngine.checkHit(x, y)
                 if (hitBug != null) {
@@ -169,7 +215,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     viewModel.missBug()
                 }
-                textViewScore.text = "Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+                updateGameHeader()
                 true
             } else false
         }
@@ -178,17 +224,34 @@ class MainActivity : AppCompatActivity() {
     private fun onGameOver() {
         viewModel.isGameRunning = false
         gameEngine.bugs.clear()
-        val gameView = findViewById<GameView>(R.id.gameView)
-        gameView.bugs = emptyList()
-        gameView.invalidate()
+        val gameView = findViewById<GameView?>(R.id.gameView)
+        gameView?.bugs = emptyList()
+        gameView?.invalidate()
 
-        findViewById<Button>(R.id.buttonStart).visibility = View.VISIBLE
-        findViewById<TextView>(R.id.textViewScore).text = "Игра окончена! Очки: ${viewModel.score}"
+        findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
+        findViewById<TextView?>(R.id.textViewScore)?.text = "Игра окончена! Очки: ${viewModel.score}"
+
+        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+        val record = ScoreRecord(
+            userName = viewModel.currentUserName,
+            score = viewModel.score,
+            difficulty = viewModel.difficultyName,
+            hits = viewModel.hits,
+            misses = viewModel.misses,
+            accuracy = viewModel.accuracy,
+            date = dateFormat.format(Date())
+        )
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            database.scoreRecordDao().insertRecord(record)
+        }
 
         val message = """
             Раунд завершен!
             
+            Игрок: ${viewModel.currentUserName}
             Итоговые очки: ${viewModel.score}
+            Сложность: ${viewModel.difficultyName}
             Попадания: ${viewModel.hits}
             Промахи: ${viewModel.misses}
             Точность: ${String.format(Locale.getDefault(), "%.1f%%", viewModel.accuracy)}
@@ -203,6 +266,108 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Закрыть", null)
             .show()
+    }
+
+    private fun loadRecords() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val records = database.scoreRecordDao().getAllRecords()
+            withContext(Dispatchers.Main) {
+                val listView = findViewById<ListView?>(R.id.listViewRecords)
+                val emptyView = findViewById<TextView?>(R.id.textViewEmptyRecords)
+                if (records.isEmpty()) {
+                    emptyView?.visibility = View.VISIBLE
+                    listView?.visibility = View.GONE
+                } else {
+                    emptyView?.visibility = View.GONE
+                    listView?.visibility = View.VISIBLE
+                    listView?.adapter = RecordAdapter(this@MainActivity, records)
+                }
+            }
+        }
+    }
+
+    private fun showSelectUserDialog() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val users = database.userDao().getAllUsers()
+            withContext(Dispatchers.Main) {
+                if (users.isEmpty()) {
+                    Toast.makeText(this@MainActivity, "Нет зарегистрированных игроков", Toast.LENGTH_SHORT).show()
+                    return@withContext
+                }
+
+                val userNames = users.map { "${it.name} (${it.zodiac})" }.toTypedArray()
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Выберите игрока")
+                    .setItems(userNames) { _, which ->
+                        val selectedUser = users[which]
+                        viewModel.currentUserName = selectedUser.name
+                        viewModel.currentUserZodiac = selectedUser.zodiac
+                        updateGameHeader()
+                        Toast.makeText(this@MainActivity, "Текущий игрок: ${selectedUser.name}", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Отмена", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun showNewUserDialog() {
+        val input = EditText(this)
+        input.hint = "Введите имя игрока"
+
+        AlertDialog.Builder(this)
+            .setTitle("Регистрация нового игрока")
+            .setView(input)
+            .setPositiveButton("Создать") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    registerUser(name, "Не указан")
+                } else {
+                    Toast.makeText(this, "Имя не может быть пустым", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun registerUser(name: String, zodiac: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val existing = database.userDao().getUserByName(name)
+            if (existing == null) {
+                database.userDao().insertUser(User(name = name, zodiac = zodiac))
+            }
+            withContext(Dispatchers.Main) {
+                viewModel.currentUserName = name
+                viewModel.currentUserZodiac = zodiac
+                updateGameHeader()
+                Toast.makeText(this@MainActivity, "Игрок '$name' активирован!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun setupListeners() {
+        findViewById<CalendarView>(R.id.calendarView).setOnDateChangeListener { _, _, month, dayOfMonth ->
+            selectedDay = dayOfMonth
+            selectedMonth = month + 1
+        }
+
+        findViewById<Button>(R.id.buttonRegister).setOnClickListener {
+            val name = findViewById<EditText>(R.id.editTextFullName).text.toString().trim()
+            if (name.isEmpty()) {
+                Toast.makeText(this, "Введите имя игрока", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val zodiac = ZodiacHelper.getZodiac(selectedMonth, selectedDay)
+            findViewById<ImageView>(R.id.imageViewZodiac).setImageResource(
+                ZodiacHelper.getZodiacImage(selectedMonth, selectedDay)
+            )
+            findViewById<TextView>(R.id.textViewResult).text =
+                "Игрок: $name\nЗнак: $zodiac\nСчет: ${viewModel.score}"
+
+            // Сохраняем в Room и активируем игрока
+            registerUser(name, zodiac)
+        }
     }
 
     private fun setupSwipeGestures() {
@@ -227,7 +392,7 @@ class MainActivity : AppCompatActivity() {
                     abs(diffX) > SWIPE_THRESHOLD &&
                     abs(velocityX) > SWIPE_VELOCITY_THRESHOLD
                 ) {
-                    val tabsCount = 5
+                    val tabsCount = 6
 
                     if (tabHost.currentTab == 4 && viewModel.isGameRunning) {
                         return false
@@ -256,9 +421,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettings() {
-        val seekBarSpeed = findViewById<SeekBar>(R.id.seekBarSpeed)
-        val editTextMaxBugs = findViewById<EditText>(R.id.editTextMaxBugs)
-        val editTextRoundDuration = findViewById<EditText>(R.id.editTextRoundDuration)
+        val seekBarSpeed = findViewById<SeekBar?>(R.id.seekBarSpeed)
+        val editTextMaxBugs = findViewById<EditText?>(R.id.editTextMaxBugs)
+        val editTextRoundDuration = findViewById<EditText?>(R.id.editTextRoundDuration)
 
         seekBarSpeed?.progress = (viewModel.gameSpeed - 1.0f).toInt().coerceAtLeast(0)
         if (editTextMaxBugs?.text.isNullOrEmpty()) {
@@ -313,7 +478,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.resetGame()
 
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
-        findViewById<TextView?>(R.id.textViewScore)?.text = "Очки: 0 | Время: ${viewModel.roundDuration}с"
+        updateGameHeader()
 
         if (::gameEngine.isInitialized) {
             gameEngine.bugs.clear()
@@ -322,26 +487,6 @@ class MainActivity : AppCompatActivity() {
         val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
         gameView?.invalidate()
-    }
-
-    private fun setupListeners() {
-        findViewById<CalendarView>(R.id.calendarView).setOnDateChangeListener { _, _, month, dayOfMonth ->
-            selectedDay = dayOfMonth
-            selectedMonth = month + 1
-        }
-
-        findViewById<Button>(R.id.buttonRegister).setOnClickListener {
-            val name = findViewById<EditText>(R.id.editTextFullName).text.toString()
-            if (name.isEmpty()) return@setOnClickListener
-
-            val zodiac = ZodiacHelper.getZodiac(selectedMonth, selectedDay)
-            findViewById<ImageView>(R.id.imageViewZodiac).setImageResource(
-                ZodiacHelper.getZodiacImage(selectedMonth, selectedDay)
-            )
-            findViewById<TextView>(R.id.textViewResult).text =
-                "Игрок: $name\nЗнак: $zodiac\nСчет: ${viewModel.score}"
-            Toast.makeText(this, "Регистрация успешна!", Toast.LENGTH_SHORT).show()
-        }
     }
 
     override fun onDestroy() {
