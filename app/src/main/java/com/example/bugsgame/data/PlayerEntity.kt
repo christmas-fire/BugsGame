@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "players",
     indices = [
-        Index(value = ["normalizedName"], unique = true) // Защита UNIQUE по стр. 19
+        Index(value = ["normalizedName"], unique = true)
     ]
 )
 data class PlayerEntity(

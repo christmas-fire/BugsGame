@@ -21,6 +21,7 @@ import com.example.bugsgame.adapter.AuthorAdapter
 import com.example.bugsgame.adapter.RecordAdapter
 import com.example.bugsgame.data.AppDatabase
 import com.example.bugsgame.data.GameRepository
+import com.example.bugsgame.data.PlayerEntity
 import com.example.bugsgame.engine.GameEngine
 import com.example.bugsgame.model.Author
 import com.example.bugsgame.util.ZodiacHelper
@@ -41,6 +42,10 @@ class MainActivity : AppCompatActivity() {
     private var lastTickTime = 0L
     private lateinit var gestureDetector: GestureDetector
 
+    private var filterPlayerId: Long? = null
+    private var sortByScore: Boolean = true
+    private var playersList: List<PlayerEntity> = emptyList()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -58,6 +63,7 @@ class MainActivity : AppCompatActivity() {
         setupListeners()
         setupGame()
         setupSettings()
+        setupRecordFilters()
         setupSwipeGestures()
     }
 
@@ -97,10 +103,12 @@ class MainActivity : AppCompatActivity() {
         tabHost.setOnTabChangedListener {
             viewModel.currentTab = tabHost.currentTab
             if (tabHost.currentTab == 5) {
+                updatePlayerFilterSpinner()
                 loadRecords()
             }
         }
     }
+
 
     private fun setupContent() {
         findViewById<TextView>(R.id.textViewRules).text =
@@ -145,8 +153,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupGame() {
-        val gameView = findViewById<GameView?>(R.id.gameView)
-        val buttonStart = findViewById<Button?>(R.id.buttonStart)
+        val gameView = findViewById<GameView>(R.id.gameView)
+        val buttonStart = findViewById<Button>(R.id.buttonStart)
 
         gameEngine = GameEngine()
         gameEngine.maxBugs = viewModel.maxBugs
@@ -203,6 +211,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         handler.post(runnable)
+
 
         gameView?.onBugClick = { x, y ->
             if (viewModel.isGameRunning) {
@@ -262,9 +271,49 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun setupRecordFilters() {
+        val spinnerSort = findViewById<Spinner?>(R.id.spinnerSortBy)
+        val sortOptions = listOf("Лучшие (по очкам)", "Последние (по дате)")
+        val sortAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, sortOptions)
+        spinnerSort?.adapter = sortAdapter
+
+        spinnerSort?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                sortByScore = (position == 0)
+                loadRecords()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        val spinnerPlayer = findViewById<Spinner?>(R.id.spinnerFilterPlayer)
+        spinnerPlayer?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                filterPlayerId = if (position == 0) null else playersList.getOrNull(position - 1)?.id
+                loadRecords()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun updatePlayerFilterSpinner() {
+        lifecycleScope.launch {
+            playersList = repository.getAllPlayers()
+            val names = mutableListOf("Все игроки")
+            names.addAll(playersList.map { it.name })
+
+            val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, names)
+            findViewById<Spinner?>(R.id.spinnerFilterPlayer)?.adapter = adapter
+        }
+    }
+
+
     private fun loadRecords() {
         lifecycleScope.launch {
-            val records = repository.getTopRecords()
+            val records = repository.getFilteredRecords(
+                playerId = filterPlayerId,
+                difficulty = null,
+                sortByScore = sortByScore
+            )
             val listView = findViewById<ListView?>(R.id.listViewRecords)
             val emptyView = findViewById<TextView?>(R.id.textViewEmptyRecords)
             if (records.isEmpty()) {
@@ -286,19 +335,38 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
 
-            val names = players.map { "${it.name} (${it.zodiac})" }.toTypedArray()
+            val userNames = players.map { "${it.name} (${it.zodiac})" }.toTypedArray()
             AlertDialog.Builder(this@MainActivity)
                 .setTitle("Выберите игрока")
-                .setItems(names) { _, which ->
-                    val selected = players[which]
-                    viewModel.currentUserName = selected.name
-                    viewModel.currentUserZodiac = selected.zodiac
+                .setItems(userNames) { _, which ->
+                    val selectedUser = players[which]
+                    viewModel.currentUserName = selectedUser.name
+                    viewModel.currentUserZodiac = selectedUser.zodiac
                     updateGameHeader()
-                    Toast.makeText(this@MainActivity, "Текущий игрок: ${selected.name}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Текущий игрок: ${selectedUser.name}", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("Отмена", null)
                 .show()
         }
+    }
+
+    private fun showNewUserDialog() {
+        val input = EditText(this)
+        input.hint = "Введите имя игрока"
+
+        AlertDialog.Builder(this)
+            .setTitle("Регистрация нового игрока")
+            .setView(input)
+            .setPositiveButton("Создать") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    registerUser(name, "Не указан")
+                } else {
+                    Toast.makeText(this, "Имя не может быть пустым", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 
     private fun registerUser(name: String, zodiac: String) {
@@ -337,6 +405,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupSwipeGestures() {
         val tabHost = findViewById<TabHost>(android.R.id.tabhost)
+
 
         gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             private val SWIPE_THRESHOLD = 100
@@ -423,6 +492,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+
 
         editTextRoundDuration?.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}

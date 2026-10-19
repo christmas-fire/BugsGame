@@ -3,7 +3,6 @@ package com.example.bugsgame.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GameSessionDao {
@@ -23,10 +22,14 @@ interface GameSessionDao {
             s.finishedAtEpochMillis AS finishedAtEpochMillis
         FROM game_sessions s
         INNER JOIN players p ON s.playerId = p.id
-        WHERE (:difficulty IS NULL OR s.difficulty = :difficulty)
+        WHERE (:playerId IS NULL OR s.playerId = :playerId)
+          AND (:difficulty IS NULL OR s.difficulty = :difficulty)
         ORDER BY s.score DESC, s.finishedAtEpochMillis DESC, s.id DESC
     """)
-    fun observeTopRecords(difficulty: String? = null): Flow<List<RecordDisplayItem>>
+    suspend fun getTopRecordsByScore(
+        playerId: Long?,
+        difficulty: String?
+    ): List<RecordDisplayItem>
 
     @Query("""
         SELECT 
@@ -41,7 +44,12 @@ interface GameSessionDao {
             s.finishedAtEpochMillis AS finishedAtEpochMillis
         FROM game_sessions s
         INNER JOIN players p ON s.playerId = p.id
-        ORDER BY s.score DESC, s.finishedAtEpochMillis DESC, s.id DESC
+        WHERE (:playerId IS NULL OR s.playerId = :playerId)
+          AND (:difficulty IS NULL OR s.difficulty = :difficulty)
+        ORDER BY s.finishedAtEpochMillis DESC, s.id DESC
     """)
-    suspend fun getTopRecords(): List<RecordDisplayItem>
+    suspend fun getRecentRecordsByDate(
+        playerId: Long?,
+        difficulty: String?
+    ): List<RecordDisplayItem>
 }

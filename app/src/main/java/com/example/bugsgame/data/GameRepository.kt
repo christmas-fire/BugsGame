@@ -1,7 +1,6 @@
 package com.example.bugsgame.data
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 class GameRepository(private val database: AppDatabase) {
@@ -15,9 +14,7 @@ class GameRepository(private val database: AppDatabase) {
             val normalized = displayName.lowercase()
 
             val existing = playerDao.getPlayerByNormalizedName(normalized)
-            if (existing != null) {
-                return@withContext existing
-            }
+            if (existing != null) return@withContext existing
 
             val newPlayer = PlayerEntity(
                 name = displayName,
@@ -50,12 +47,16 @@ class GameRepository(private val database: AppDatabase) {
         return@withContext sessionDao.insertSession(session)
     }
 
-    suspend fun getTopRecords(): List<RecordDisplayItem> = withContext(Dispatchers.IO) {
-        sessionDao.getTopRecords()
-    }
-
-    fun observeTopRecords(difficulty: String? = null): Flow<List<RecordDisplayItem>> {
-        return sessionDao.observeTopRecords(difficulty)
+    suspend fun getFilteredRecords(
+        playerId: Long?,
+        difficulty: String?,
+        sortByScore: Boolean
+    ): List<RecordDisplayItem> = withContext(Dispatchers.IO) {
+        if (sortByScore) {
+            sessionDao.getTopRecordsByScore(playerId, difficulty)
+        } else {
+            sessionDao.getRecentRecordsByDate(playerId, difficulty)
+        }
     }
 
     suspend fun getAllPlayers(): List<PlayerEntity> = withContext(Dispatchers.IO) {
