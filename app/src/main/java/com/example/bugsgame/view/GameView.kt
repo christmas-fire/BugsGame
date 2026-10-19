@@ -14,11 +14,27 @@ import androidx.core.content.ContextCompat
 import com.example.bugsgame.R
 import com.example.bugsgame.model.Bug
 import com.example.bugsgame.model.BugType
+import com.example.bugsgame.model.Bonus
 
 class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
 
     private val dstRect = RectF()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private val bonusBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FFD700") // Золотой круг бонуса
+    }
+    private val bonusStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FF6F00")
+        style = Paint.Style.STROKE
+        strokeWidth = 6f
+    }
+    private val bonusTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.BLACK
+        textSize = 42f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
 
     private val fallbackBitmap: Bitmap by lazy {
         loadBitmapFromDrawable(R.drawable.bug) ?: Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply {
@@ -57,14 +73,25 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
     }
 
     var bugs: List<Bug> = emptyList()
+    var bonus: Bonus? = null
     var onBugClick: ((x: Float, y: Float) -> Boolean)? = null
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+
         for (bug in bugs) {
             val bitmap = bugBitmaps[bug.type] ?: fallbackBitmap
             dstRect.set(bug.x, bug.y, bug.x + bug.size, bug.y + bug.size)
             canvas.drawBitmap(bitmap, null, dstRect, paint)
+        }
+
+        bonus?.let { b ->
+            val radius = b.size / 2f
+            val cx = b.x + radius
+            val cy = b.y + radius
+            canvas.drawCircle(cx, cy, radius, bonusBgPaint)
+            canvas.drawCircle(cx, cy, radius, bonusStrokePaint)
+            canvas.drawText("⭐", cx, cy + 14f, bonusTextPaint)
         }
     }
 

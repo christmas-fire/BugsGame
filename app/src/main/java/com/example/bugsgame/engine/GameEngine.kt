@@ -2,6 +2,7 @@ package com.example.bugsgame.engine
 
 import com.example.bugsgame.model.Bug
 import com.example.bugsgame.model.BugType
+import com.example.bugsgame.model.Bonus
 import com.example.bugsgame.viewmodel.GameViewModel
 import java.util.Random
 import kotlin.math.cos
@@ -14,6 +15,13 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
     var maxBugs: Int = 10
     var topOffset: Int = 0
 
+    var bonus: Bonus? = null
+    var isTiltModeActive: Boolean = false
+    var tiltModeEndTime: Long = 0L
+    var tiltX: Float = 0f
+    var tiltY: Float = 0f
+    private var lastBonusSpawnTime: Long = 0L
+
     fun updateSize(newWidth: Int, newHeight: Int, newTopOffset: Int = 0) {
         if (newWidth > 0 && newHeight > 0) {
             this.width = newWidth
@@ -25,13 +33,33 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
     fun startGame(viewModel: GameViewModel) {
         this.maxBugs = viewModel.maxBugs
         this.bugs.clear()
+        this.bonus = null
+        this.isTiltModeActive = false
+        this.lastBonusSpawnTime = System.currentTimeMillis()
     }
 
     fun updateBugs(gameSpeedMultiplier: Float) {
+        val now = System.currentTimeMillis()
+
+        if (isTiltModeActive && now > tiltModeEndTime) {
+            isTiltModeActive = false
+        }
+
+        if (bonus == null && now - lastBonusSpawnTime >= 15000L) {
+            spawnBonus()
+            lastBonusSpawnTime = now
+        }
+
         for (bug in bugs) {
-            val totalSpeed = bug.speed * gameSpeedMultiplier
-            bug.x += bug.dx * totalSpeed
-            bug.y += bug.dy * totalSpeed
+            if (isTiltModeActive) {
+                val gravityForce = 4.5f * gameSpeedMultiplier
+                bug.x += (bug.dx * 0.8f) + (tiltX * gravityForce)
+                bug.y += (bug.dy * 0.8f) + (tiltY * gravityForce)
+            } else {
+                val totalSpeed = bug.speed * gameSpeedMultiplier
+                bug.x += bug.dx * totalSpeed
+                bug.y += bug.dy * totalSpeed
+            }
 
             if (bug.x <= 0) {
                 bug.x = 0f
@@ -84,6 +112,28 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
                 )
             )
         }
+    }
+
+    private fun spawnBonus() {
+        val size = 110
+        val maxX = (width - size).coerceAtLeast(1)
+        val availableHeight = (height - size - topOffset).coerceAtLeast(1)
+
+        val x = random.nextInt(maxX).toFloat()
+        val y = (random.nextInt(availableHeight) + topOffset).toFloat()
+
+        bonus = Bonus(x, y, size)
+    }
+
+    fun checkBonusHit(touchX: Float, touchY: Float): Boolean {
+        val currentBonus = bonus ?: return false
+        if (currentBonus.contains(touchX, touchY)) {
+            bonus = null
+            isTiltModeActive = true
+            tiltModeEndTime = System.currentTimeMillis() + currentBonus.durationMs
+            return true
+        }
+        return false
     }
 
     fun checkHit(touchX: Float, touchY: Float): Bug? {

@@ -1,5 +1,11 @@
 package com.example.bugsgame
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -31,7 +37,7 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.abs
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SensorEventListener {
     private var selectedDay = 1
     private var selectedMonth = 1
 
@@ -41,6 +47,10 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var lastTickTime = 0L
     private lateinit var gestureDetector: GestureDetector
+
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+    private var screamPlayer: MediaPlayer? = null
 
     private var filterPlayerId: Long? = null
     private var sortByScore: Boolean = true
@@ -55,8 +65,10 @@ class MainActivity : AppCompatActivity() {
 
         val database = AppDatabase.getInstance(this)
         repository = GameRepository(database)
-
         viewModel = ViewModelProvider(this).get(GameViewModel::class.java)
+
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
         setupTabs()
         setupContent()
@@ -65,6 +77,60 @@ class MainActivity : AppCompatActivity() {
         setupSettings()
         setupRecordFilters()
         setupSwipeGestures()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        accelerometer?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager.unregisterListener(this)
+        stopBugScream()
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+
+            val ax = -event.values[0]
+            val ay = event.values[1]
+
+            if (::gameEngine.isInitialized) {
+                gameEngine.tiltX = ax
+                gameEngine.tiltY = ay
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun playBugScream() {
+        try {
+            stopBugScream()
+            val resId = resources.getIdentifier("bug_scream", "raw", packageName)
+            if (resId != 0) {
+                screamPlayer = MediaPlayer.create(this, resId)
+                screamPlayer?.setOnCompletionListener {
+                    stopBugScream()
+                }
+                screamPlayer?.start()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun stopBugScream() {
+        try {
+            screamPlayer?.stop()
+            screamPlayer?.release()
+            screamPlayer = null
+        } catch (e: Exception) {
+            screamPlayer = null
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -109,7 +175,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
     private fun setupContent() {
         findViewById<TextView>(R.id.textViewRules).text =
             HtmlCompat.fromHtml(getString(R.string.game_rules), HtmlCompat.FROM_HTML_MODE_LEGACY)
@@ -123,7 +188,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateGameHeader() {
         val textViewScore = findViewById<TextView?>(R.id.textViewScore)
-        textViewScore?.text = "Игрок: ${viewModel.currentUserName} | Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с"
+        val bonusNotice = if (::gameEngine.isInitialized && gameEngine.isTiltModeActive) " | ⚡ ГРАВИТАЦИЯ!" else ""
+        textViewScore?.text = "Игрок: ${viewModel.currentUserName} | Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с$bonusNotice"
     }
 
     private fun startRound() {
@@ -202,6 +268,7 @@ class MainActivity : AppCompatActivity() {
                         gameEngine.spawnBug()
                         gameEngine.updateBugs(viewModel.gameSpeed)
                         gameView.bugs = ArrayList(gameEngine.bugs)
+                        gameView.bonus = gameEngine.bonus
                         gameView.invalidate()
                         updateGameHeader()
                     }
@@ -212,26 +279,36 @@ class MainActivity : AppCompatActivity() {
         }
         handler.post(runnable)
 
-
         gameView?.onBugClick = { x, y ->
             if (viewModel.isGameRunning) {
-                val hitBug = gameEngine.checkHit(x, y)
-                if (hitBug != null) {
-                    viewModel.hitBug(hitBug.points)
+                if (gameEngine.checkBonusHit(x, y)) {
+                    playBugScream()
+                    Toast.makeText(this@MainActivity, "Бонус взят! Наклоняйте телефон!", Toast.LENGTH_SHORT).show()
+                    updateGameHeader()
+                    true
                 } else {
-                    viewModel.missBug()
+                    val hitBug = gameEngine.checkHit(x, y)
+                    if (hitBug != null) {
+                        viewModel.hitBug(hitBug.points)
+                    } else {
+                        viewModel.missBug()
+                    }
+                    updateGameHeader()
+                    true
                 }
-                updateGameHeader()
-                true
             } else false
         }
     }
 
     private fun onGameOver() {
         viewModel.isGameRunning = false
+        stopBugScream()
         gameEngine.bugs.clear()
+        gameEngine.bonus = null
+        gameEngine.isTiltModeActive = false
         val gameView = findViewById<GameView>(R.id.gameView)
         gameView?.bugs = emptyList()
+        gameView?.bonus = null
         gameView?.invalidate()
 
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
@@ -305,7 +382,6 @@ class MainActivity : AppCompatActivity() {
             findViewById<Spinner?>(R.id.spinnerFilterPlayer)?.adapter = adapter
         }
     }
-
 
     private fun loadRecords() {
         lifecycleScope.launch {
@@ -406,7 +482,6 @@ class MainActivity : AppCompatActivity() {
     private fun setupSwipeGestures() {
         val tabHost = findViewById<TabHost>(android.R.id.tabhost)
 
-
         gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             private val SWIPE_THRESHOLD = 100
             private val SWIPE_VELOCITY_THRESHOLD = 100
@@ -493,7 +568,6 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-
         editTextRoundDuration?.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -512,20 +586,25 @@ class MainActivity : AppCompatActivity() {
     private fun resetGameState() {
         viewModel.resetGame()
 
+        stopBugScream()
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
         updateGameHeader()
 
         if (::gameEngine.isInitialized) {
             gameEngine.bugs.clear()
+            gameEngine.bonus = null
+            gameEngine.isTiltModeActive = false
             gameEngine.maxBugs = viewModel.maxBugs
         }
         val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
+        gameView?.bonus = null
         gameView?.invalidate()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
+        stopBugScream()
     }
 }
