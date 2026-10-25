@@ -70,6 +70,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
+        lifecycleScope.launch {
+            val goldPrice = com.example.bugsgame.network.CbrClient.fetchGoldPrice()
+            gameEngine.goldPrice = goldPrice
+        }
+
         setupTabs()
         setupContent()
         setupListeners()
@@ -290,6 +295,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     val hitBug = gameEngine.checkHit(x, y)
                     if (hitBug != null) {
                         viewModel.hitBug(hitBug.points)
+                        if (hitBug.type == com.example.bugsgame.model.BugType.GOLDEN) {
+                            Toast.makeText(this@MainActivity, "Пойман Золотой таракан! +${hitBug.points} очков (по курсу)", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
                         viewModel.missBug()
                     }

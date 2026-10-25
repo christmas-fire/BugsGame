@@ -22,6 +22,9 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
     var tiltY: Float = 0f
     private var lastBonusSpawnTime: Long = 0L
 
+    var goldPrice: Double = 7500.0
+    private var lastGoldenBugSpawnTime: Long = 0L
+
     fun updateSize(newWidth: Int, newHeight: Int, newTopOffset: Int = 0) {
         if (newWidth > 0 && newHeight > 0) {
             this.width = newWidth
@@ -36,6 +39,7 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
         this.bonus = null
         this.isTiltModeActive = false
         this.lastBonusSpawnTime = System.currentTimeMillis()
+        this.lastGoldenBugSpawnTime = System.currentTimeMillis()
     }
 
     fun updateBugs(gameSpeedMultiplier: Float) {
@@ -49,6 +53,12 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
             spawnBonus()
             lastBonusSpawnTime = now
         }
+
+        if (now - lastGoldenBugSpawnTime >= 20000L) {
+            spawnGoldenBug()
+            lastGoldenBugSpawnTime = now
+        }
+
 
         for (bug in bugs) {
             if (isTiltModeActive) {
@@ -143,5 +153,34 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
             }
         }
         return null
+    }
+
+    private fun spawnGoldenBug() {
+        val type = BugType.GOLDEN
+        val size = type.size
+        val maxX = (width - size).coerceAtLeast(1)
+        val availableHeight = (height - size - topOffset).coerceAtLeast(1)
+
+        val x = random.nextInt(maxX).toFloat()
+        val y = (random.nextInt(availableHeight) + topOffset).toFloat()
+
+        val angle = random.nextDouble() * 2 * Math.PI
+        val dx = cos(angle).toFloat()
+        val dy = sin(angle).toFloat()
+
+        val proportionalPoints = (goldPrice / 100.0).toInt().coerceAtLeast(50)
+
+        bugs.add(
+            Bug(
+                type = type,
+                x = x,
+                y = y,
+                size = size,
+                points = proportionalPoints,
+                speed = type.baseSpeed,
+                dx = dx,
+                dy = dy
+            )
+        )
     }
 }

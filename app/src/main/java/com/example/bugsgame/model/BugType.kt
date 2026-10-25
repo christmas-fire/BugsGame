@@ -9,5 +9,7 @@ enum class BugType(
 ) {
     COMMON("Обычный", baseSpeed = 3.5f, size = 110, points = 10, drawableResName = "bug"),
     FAST("Быстрый", baseSpeed = 7.5f, size = 80, points = 25, drawableResName = "bug1"),
-    RARE("Редкий", baseSpeed = 2.0f, size = 200, points = 50, drawableResName = "bug2")
+    RARE("Редкий", baseSpeed = 2.0f, size = 200, points = 50, drawableResName = "bug2"),
+
+    GOLDEN("Золотой", baseSpeed = 5.5f, size = 130, points = 100, drawableResName = "bug_gold")
 }

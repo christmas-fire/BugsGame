@@ -80,9 +80,34 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
         super.onDraw(canvas)
 
         for (bug in bugs) {
-            val bitmap = bugBitmaps[bug.type] ?: fallbackBitmap
-            dstRect.set(bug.x, bug.y, bug.x + bug.size, bug.y + bug.size)
-            canvas.drawBitmap(bitmap, null, dstRect, paint)
+            if (bug.type == BugType.GOLDEN) {
+                val bitmap = bugBitmaps[bug.type]
+                if (bitmap != null && bitmap != fallbackBitmap) {
+                    dstRect.set(bug.x, bug.y, bug.x + bug.size, bug.y + bug.size)
+                    canvas.drawBitmap(bitmap, null, dstRect, paint)
+                } else {
+                    val goldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD700") }
+                    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.parseColor("#FF8F00")
+                        style = Paint.Style.STROKE
+                        strokeWidth = 5f
+                    }
+                    val r = bug.size / 2f
+                    canvas.drawCircle(bug.x + r, bug.y + r, r, goldPaint)
+                    canvas.drawCircle(bug.x + r, bug.y + r, r, strokePaint)
+                    val textP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.parseColor("#3E2723")
+                        textSize = 34f
+                        textAlign = Paint.Align.CENTER
+                        isFakeBoldText = true
+                    }
+                    canvas.drawText("Au", bug.x + r, bug.y + r + 12f, textP)
+                }
+            } else {
+                val bitmap = bugBitmaps[bug.type] ?: fallbackBitmap
+                dstRect.set(bug.x, bug.y, bug.x + bug.size, bug.y + bug.size)
+                canvas.drawBitmap(bitmap, null, dstRect, paint)
+            }
         }
 
         bonus?.let { b ->
