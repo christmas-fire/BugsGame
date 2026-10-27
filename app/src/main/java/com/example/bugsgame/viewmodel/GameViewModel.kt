@@ -1,23 +1,52 @@
 package com.example.bugsgame.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.bugsgame.data.GameRepository
+import com.example.bugsgame.data.PlayerEntity
+import com.example.bugsgame.data.RecordDisplayItem
+import com.example.bugsgame.engine.GameEngine
+import com.example.bugsgame.network.CbrClient
+import kotlinx.coroutines.launch
 
-class GameViewModel : ViewModel() {
+class GameViewModel(
+    val repository: GameRepository
+) : ViewModel() {
+
+    val gameEngine: GameEngine = GameEngine()
+
     var currentUserName: String = "Гость"
     var currentUserZodiac: String = ""
 
-    var score = 0
-    var hits = 0
-    var misses = 0
+    var score: Int = 0
+    var hits: Int = 0
+    var misses: Int = 0
 
-    var gameSpeed = 1.0f
-    var maxBugs = 10
-    var bonusInterval = 5
-    var roundDuration = 60
-    var remainingTime = 60
+    var gameSpeed: Float = 1.0f
+    var maxBugs: Int = 10
+    var bonusInterval: Int = 5
+    var roundDuration: Int = 60
+    var remainingTime: Int = 60
 
-    var currentTab = 0
-    var isGameRunning = false
+    var currentTab: Int = 0
+    var isGameRunning: Boolean = false
+
+    var lastTickTime: Long = System.currentTimeMillis()
+
+    init {
+        loadGoldPrice()
+    }
+
+    fun loadGoldPrice() {
+        viewModelScope.launch {
+            try {
+                val price = CbrClient.fetchGoldPrice()
+                gameEngine.goldPrice = price
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     val accuracy: Float
         get() {
@@ -48,6 +77,8 @@ class GameViewModel : ViewModel() {
         misses = 0
         remainingTime = roundDuration
         isGameRunning = true
+        lastTickTime = System.currentTimeMillis()
+        gameEngine.startGame(this)
     }
 
     fun resetGame() {
@@ -56,5 +87,33 @@ class GameViewModel : ViewModel() {
         misses = 0
         remainingTime = roundDuration
         isGameRunning = false
+        gameEngine.bugs.clear()
+        gameEngine.bonus = null
+        gameEngine.isTiltModeActive = false
+        gameEngine.maxBugs = maxBugs
+    }
+
+    suspend fun saveCurrentGameSession(): Long {
+        return repository.saveGameSession(
+            playerName = currentUserName,
+            playerZodiac = currentUserZodiac,
+            score = score,
+            difficulty = difficultyName,
+            hits = hits,
+            misses = misses,
+            durationSeconds = roundDuration
+        )
+    }
+
+    suspend fun registerOrGetPlayer(name: String, zodiac: String): PlayerEntity {
+        return repository.registerOrGetPlayer(name, zodiac)
+    }
+
+    suspend fun getAllPlayers(): List<PlayerEntity> {
+        return repository.getAllPlayers()
+    }
+
+    suspend fun getFilteredRecords(playerId: Long?, sortByScore: Boolean): List<RecordDisplayItem> {
+        return repository.getFilteredRecords(playerId, null, sortByScore)
     }
 }

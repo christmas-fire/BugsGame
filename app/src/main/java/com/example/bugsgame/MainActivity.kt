@@ -21,19 +21,17 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.text.HtmlCompat
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.bugsgame.adapter.AuthorAdapter
 import com.example.bugsgame.adapter.RecordAdapter
-import com.example.bugsgame.data.AppDatabase
-import com.example.bugsgame.data.GameRepository
 import com.example.bugsgame.data.PlayerEntity
-import com.example.bugsgame.engine.GameEngine
 import com.example.bugsgame.model.Author
+import com.example.bugsgame.model.BugType
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
 import kotlinx.coroutines.launch
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.util.Locale
 import kotlin.math.abs
 
@@ -41,11 +39,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var selectedDay = 1
     private var selectedMonth = 1
 
-    private lateinit var viewModel: GameViewModel
-    private lateinit var gameEngine: GameEngine
-    private lateinit var repository: GameRepository
+    private val viewModel: GameViewModel by viewModel()
+
     private val handler = Handler(Looper.getMainLooper())
-    private var lastTickTime = 0L
     private lateinit var gestureDetector: GestureDetector
 
     private lateinit var sensorManager: SensorManager
@@ -56,6 +52,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var sortByScore: Boolean = true
     private var playersList: List<PlayerEntity> = emptyList()
 
+    private var gameLoopRunnable: Runnable? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -63,17 +61,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        val database = AppDatabase.getInstance(this)
-        repository = GameRepository(database)
-        viewModel = ViewModelProvider(this).get(GameViewModel::class.java)
-
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        lifecycleScope.launch {
-            val goldPrice = com.example.bugsgame.network.CbrClient.fetchGoldPrice()
-            gameEngine.goldPrice = goldPrice
-        }
 
         setupTabs()
         setupContent()
@@ -89,6 +78,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         accelerometer?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
+        viewModel.lastTickTime = System.currentTimeMillis()
     }
 
     override fun onPause() {
@@ -99,14 +89,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-
             val ax = -event.values[0]
             val ay = event.values[1]
-
-            if (::gameEngine.isInitialized) {
-                gameEngine.tiltX = ax
-                gameEngine.tiltY = ay
-            }
+            viewModel.gameEngine.tiltX = ax
+            viewModel.gameEngine.tiltY = ay
         }
     }
 
@@ -193,7 +179,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun updateGameHeader() {
         val textViewScore = findViewById<TextView?>(R.id.textViewScore)
-        val bonusNotice = if (::gameEngine.isInitialized && gameEngine.isTiltModeActive) " | ⚡ ГРАВИТАЦИЯ!" else ""
+        val bonusNotice = if (viewModel.gameEngine.isTiltModeActive) " | ⚡ ГРАВИТАЦИЯ!" else ""
         textViewScore?.text = "Игрок: ${viewModel.currentUserName} | Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с$bonusNotice"
     }
 
@@ -204,7 +190,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         buttonStart?.visibility = View.GONE
 
         if (gameView != null && gameView.width > 0 && gameView.height > 0) {
-            gameEngine.updateSize(gameView.width, gameView.height, 0)
+            viewModel.gameEngine.updateSize(gameView.width, gameView.height, 0)
         }
 
         findViewById<SeekBar?>(R.id.seekBarSpeed)?.let {
@@ -218,21 +204,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         viewModel.startNewGame()
-        gameEngine.startGame(viewModel)
-        lastTickTime = System.currentTimeMillis()
         updateGameHeader()
     }
 
     private fun setupGame() {
-        val gameView = findViewById<GameView>(R.id.gameView)
-        val buttonStart = findViewById<Button>(R.id.buttonStart)
+        val gameView = findViewById<GameView?>(R.id.gameView)
+        val buttonStart = findViewById<Button?>(R.id.buttonStart)
 
-        gameEngine = GameEngine()
-        gameEngine.maxBugs = viewModel.maxBugs
+        viewModel.gameEngine.maxBugs = viewModel.maxBugs
 
         gameView?.post {
             if (gameView.width > 0 && gameView.height > 0) {
-                gameEngine.updateSize(gameView.width, gameView.height, 0)
+                viewModel.gameEngine.updateSize(gameView.width, gameView.height, 0)
             }
         }
 
@@ -249,20 +232,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        val runnable = object : Runnable {
+        gameLoopRunnable = object : Runnable {
             override fun run() {
-                if (viewModel.isGameRunning && gameView != null) {
-                    if (gameView.width > 0 && gameView.height > 0 &&
-                        (gameEngine.width != gameView.width || gameEngine.height != gameView.height)
+                val currentView = findViewById<GameView?>(R.id.gameView)
+                if (viewModel.isGameRunning && currentView != null) {
+                    if (currentView.width > 0 && currentView.height > 0 &&
+                        (viewModel.gameEngine.width != currentView.width || viewModel.gameEngine.height != currentView.height)
                     ) {
-                        gameEngine.updateSize(gameView.width, gameView.height, 0)
+                        viewModel.gameEngine.updateSize(currentView.width, currentView.height, 0)
                     }
 
                     val currentTime = System.currentTimeMillis()
-
-                    if (currentTime - lastTickTime >= 1000L) {
+                    if (currentTime - viewModel.lastTickTime >= 1000L) {
                         viewModel.remainingTime--
-                        lastTickTime = currentTime
+                        viewModel.lastTickTime = currentTime
 
                         if (viewModel.remainingTime <= 0) {
                             onGameOver()
@@ -270,32 +253,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     }
 
                     if (viewModel.isGameRunning) {
-                        gameEngine.spawnBug()
-                        gameEngine.updateBugs(viewModel.gameSpeed)
-                        gameView.bugs = ArrayList(gameEngine.bugs)
-                        gameView.bonus = gameEngine.bonus
-                        gameView.invalidate()
+                        viewModel.gameEngine.spawnBug()
+                        viewModel.gameEngine.updateBugs(viewModel.gameSpeed)
+                        currentView.bugs = ArrayList(viewModel.gameEngine.bugs)
+                        currentView.bonus = viewModel.gameEngine.bonus
+                        currentView.invalidate()
                         updateGameHeader()
                     }
+                } else if (!viewModel.isGameRunning && currentView != null) {
+                    currentView.bugs = ArrayList(viewModel.gameEngine.bugs)
+                    currentView.bonus = viewModel.gameEngine.bonus
+                    currentView.invalidate()
                 }
 
                 handler.postDelayed(this, 30)
             }
         }
-        handler.post(runnable)
+        gameLoopRunnable?.let { handler.post(it) }
 
         gameView?.onBugClick = { x, y ->
             if (viewModel.isGameRunning) {
-                if (gameEngine.checkBonusHit(x, y)) {
+                if (viewModel.gameEngine.checkBonusHit(x, y)) {
                     playBugScream()
                     Toast.makeText(this@MainActivity, "Бонус взят! Наклоняйте телефон!", Toast.LENGTH_SHORT).show()
                     updateGameHeader()
                     true
                 } else {
-                    val hitBug = gameEngine.checkHit(x, y)
+                    val hitBug = viewModel.gameEngine.checkHit(x, y)
                     if (hitBug != null) {
                         viewModel.hitBug(hitBug.points)
-                        if (hitBug.type == com.example.bugsgame.model.BugType.GOLDEN) {
+                        if (hitBug.type == BugType.GOLDEN) {
                             Toast.makeText(this@MainActivity, "Пойман Золотой таракан! +${hitBug.points} очков (по курсу)", Toast.LENGTH_SHORT).show()
                         }
                     } else {
@@ -311,10 +298,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private fun onGameOver() {
         viewModel.isGameRunning = false
         stopBugScream()
-        gameEngine.bugs.clear()
-        gameEngine.bonus = null
-        gameEngine.isTiltModeActive = false
-        val gameView = findViewById<GameView>(R.id.gameView)
+        viewModel.gameEngine.bugs.clear()
+        viewModel.gameEngine.bonus = null
+        viewModel.gameEngine.isTiltModeActive = false
+        val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
         gameView?.bonus = null
         gameView?.invalidate()
@@ -323,15 +310,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         findViewById<TextView?>(R.id.textViewScore)?.text = "Игра окончена! Очки: ${viewModel.score}"
 
         lifecycleScope.launch {
-            repository.saveGameSession(
-                playerName = viewModel.currentUserName,
-                playerZodiac = viewModel.currentUserZodiac,
-                score = viewModel.score,
-                difficulty = viewModel.difficultyName,
-                hits = viewModel.hits,
-                misses = viewModel.misses,
-                durationSeconds = viewModel.roundDuration
-            )
+            viewModel.saveCurrentGameSession()
         }
 
         val message = """
@@ -382,7 +361,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun updatePlayerFilterSpinner() {
         lifecycleScope.launch {
-            playersList = repository.getAllPlayers()
+            playersList = viewModel.getAllPlayers()
             val names = mutableListOf("Все игроки")
             names.addAll(playersList.map { it.name })
 
@@ -393,11 +372,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun loadRecords() {
         lifecycleScope.launch {
-            val records = repository.getFilteredRecords(
-                playerId = filterPlayerId,
-                difficulty = null,
-                sortByScore = sortByScore
-            )
+            val records = viewModel.getFilteredRecords(filterPlayerId, sortByScore)
             val listView = findViewById<ListView?>(R.id.listViewRecords)
             val emptyView = findViewById<TextView?>(R.id.textViewEmptyRecords)
             if (records.isEmpty()) {
@@ -413,7 +388,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun showSelectUserDialog() {
         lifecycleScope.launch {
-            val players = repository.getAllPlayers()
+            val players = viewModel.getAllPlayers()
             if (players.isEmpty()) {
                 Toast.makeText(this@MainActivity, "Нет зарегистрированных игроков", Toast.LENGTH_SHORT).show()
                 return@launch
@@ -434,28 +409,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    private fun showNewUserDialog() {
-        val input = EditText(this)
-        input.hint = "Введите имя игрока"
-
-        AlertDialog.Builder(this)
-            .setTitle("Регистрация нового игрока")
-            .setView(input)
-            .setPositiveButton("Создать") { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isNotEmpty()) {
-                    registerUser(name, "Не указан")
-                } else {
-                    Toast.makeText(this, "Имя не может быть пустым", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
     private fun registerUser(name: String, zodiac: String) {
         lifecycleScope.launch {
-            val player = repository.registerOrGetPlayer(name, zodiac)
+            val player = viewModel.registerOrGetPlayer(name, zodiac)
             viewModel.currentUserName = player.name
             viewModel.currentUserZodiac = player.zodiac
             updateGameHeader()
@@ -569,7 +525,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     val newMax = s?.toString()?.toIntOrNull()
                     if (newMax != null && newMax > 0 && newMax != viewModel.maxBugs) {
                         viewModel.maxBugs = newMax
-                        gameEngine.maxBugs = newMax
                         resetGameState()
                     }
                 }
@@ -593,17 +548,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun resetGameState() {
         viewModel.resetGame()
-
         stopBugScream()
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
         updateGameHeader()
 
-        if (::gameEngine.isInitialized) {
-            gameEngine.bugs.clear()
-            gameEngine.bonus = null
-            gameEngine.isTiltModeActive = false
-            gameEngine.maxBugs = viewModel.maxBugs
-        }
         val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
         gameView?.bonus = null
@@ -612,7 +560,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
+        gameLoopRunnable?.let { handler.removeCallbacks(it) }
         stopBugScream()
     }
 }

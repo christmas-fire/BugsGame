@@ -22,7 +22,7 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val bonusBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFD700") // Золотой круг бонуса
+        color = Color.parseColor("#FFD700")
     }
     private val bonusStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#FF6F00")
