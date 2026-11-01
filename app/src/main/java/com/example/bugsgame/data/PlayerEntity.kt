@@ -15,5 +15,10 @@ data class PlayerEntity(
     val id: Long = 0,
     val name: String,
     val normalizedName: String,
-    val zodiac: String = ""
+    val zodiac: String = "",
+    val coins: Int = 0,
+    val freezeCharges: Int = 0,
+    val bombCharges: Int = 0,
+    val slowCharges: Int = 0,
+    val multitouchCharges: Int = 0
 )
