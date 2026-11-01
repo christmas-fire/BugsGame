@@ -27,6 +27,7 @@ import com.example.bugsgame.adapter.RecordAdapter
 import com.example.bugsgame.data.PlayerEntity
 import com.example.bugsgame.model.Author
 import com.example.bugsgame.model.BugType
+import com.example.bugsgame.model.SkillType
 import com.example.bugsgame.util.ZodiacHelper
 import com.example.bugsgame.view.GameView
 import com.example.bugsgame.viewmodel.GameViewModel
@@ -53,6 +54,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var playersList: List<PlayerEntity> = emptyList()
 
     private var gameLoopRunnable: Runnable? = null
+    private var availableSkills: List<SkillType> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,9 +70,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         setupContent()
         setupListeners()
         setupGame()
+        setupShop()
         setupSettings()
         setupRecordFilters()
         setupSwipeGestures()
+
+        registerUser("Игрок", "Козерог")
     }
 
     override fun onResume() {
@@ -79,6 +84,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         viewModel.lastTickTime = System.currentTimeMillis()
+        updateShopUI()
+        updateGameSkillsSpinner()
     }
 
     override fun onPause() {
@@ -148,9 +155,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             "authors" to R.id.tabAuthors,
             "settings" to R.id.tabSettings,
             "game" to R.id.tabGame,
+            "shop" to R.id.tabShop,
             "records" to R.id.tabRecords
         )
-        val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки", "Игра", "Рекорды")
+        val titles = listOf("Регистрация", "Правила", "Авторы", "Настройки", "Игра", "Магазин", "Рекорды")
 
         tabs.forEachIndexed { i, tab ->
             tabHost.addTab(tabHost.newTabSpec(tab.first).setIndicator(titles[i]).setContent(tab.second))
@@ -159,9 +167,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         tabHost.currentTab = viewModel.currentTab
         tabHost.setOnTabChangedListener {
             viewModel.currentTab = tabHost.currentTab
-            if (tabHost.currentTab == 5) {
-                updatePlayerFilterSpinner()
-                loadRecords()
+            when (tabHost.currentTab) {
+                4 -> updateGameSkillsSpinner()
+                5 -> updateShopUI()
+                6 -> {
+                    updatePlayerFilterSpinner()
+                    loadRecords()
+                }
             }
         }
     }
@@ -179,8 +191,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun updateGameHeader() {
         val textViewScore = findViewById<TextView?>(R.id.textViewScore)
-        val bonusNotice = if (viewModel.gameEngine.isTiltModeActive) " | ⚡ ГРАВИТАЦИЯ!" else ""
-        textViewScore?.text = "Игрок: ${viewModel.currentUserName} | Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с$bonusNotice"
+        var status = ""
+        if (viewModel.gameEngine.isTiltModeActive) status += " | ⚡ ГРАВИТАЦИЯ!"
+        if (viewModel.gameEngine.isFrozen) status += " | ❄️ ЗАМОРОЗКА!"
+        if (viewModel.gameEngine.isSlowed) status += " | ⏳ ЗАМЕДЛЕНИЕ!"
+        if (viewModel.gameEngine.isMultitouchActive) status += " | ⚡ МУЛЬТИТАЧ!"
+
+        textViewScore?.text = "Игрок: ${viewModel.currentUserName} (${viewModel.currentPlayerCoins}💰) | Очки: ${viewModel.score} | Время: ${viewModel.remainingTime}с$status"
     }
 
     private fun startRound() {
@@ -205,11 +222,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         viewModel.startNewGame()
         updateGameHeader()
+        updateGameSkillsSpinner()
     }
 
     private fun setupGame() {
-        val gameView = findViewById<GameView?>(R.id.gameView)
-        val buttonStart = findViewById<Button?>(R.id.buttonStart)
+        val gameView = findViewById<GameView>(R.id.gameView)
+        val buttonStart = findViewById<Button>(R.id.buttonStart)
+        val buttonActivateSkill = findViewById<Button>(R.id.buttonActivateSkill)
+        val spinnerGameSkills = findViewById<Spinner>(R.id.spinnerGameSkills)
 
         viewModel.gameEngine.maxBugs = viewModel.maxBugs
 
@@ -230,6 +250,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             if (!viewModel.isGameRunning) {
                 showSelectUserDialog()
             }
+        }
+
+        buttonActivateSkill.setOnClickListener {
+            val skill = viewModel.selectedSkill
+            if (skill == null) {
+                Toast.makeText(this, "Выберите способность!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            lifecycleScope.launch {
+                val res = viewModel.activateSkill(skill)
+                if (res.isSuccess) {
+                    Toast.makeText(this@MainActivity, res.getOrNull(), Toast.LENGTH_SHORT).show()
+                    updateGameHeader()
+                    updateGameSkillsSpinner()
+                } else {
+                    Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        spinnerGameSkills.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (availableSkills.isNotEmpty() && position < availableSkills.size) {
+                    viewModel.selectedSkill = availableSkills[position]
+                } else {
+                    viewModel.selectedSkill = null
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
         gameLoopRunnable = object : Runnable {
@@ -257,12 +307,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         viewModel.gameEngine.updateBugs(viewModel.gameSpeed)
                         currentView.bugs = ArrayList(viewModel.gameEngine.bugs)
                         currentView.bonus = viewModel.gameEngine.bonus
+                        currentView.isFrozen = viewModel.gameEngine.isFrozen
+                        currentView.isSlowed = viewModel.gameEngine.isSlowed
+                        currentView.isMultitouchActive = viewModel.gameEngine.isMultitouchActive
                         currentView.invalidate()
                         updateGameHeader()
                     }
                 } else if (!viewModel.isGameRunning && currentView != null) {
                     currentView.bugs = ArrayList(viewModel.gameEngine.bugs)
                     currentView.bonus = viewModel.gameEngine.bonus
+                    currentView.isFrozen = false
+                    currentView.isSlowed = false
+                    currentView.isMultitouchActive = false
                     currentView.invalidate()
                 }
 
@@ -293,6 +349,69 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
             } else false
         }
+
+        gameView?.onMultiTouchClick = { touches ->
+            if (viewModel.isGameRunning) {
+                val hitBugs = viewModel.gameEngine.checkMultiHit(touches)
+                if (hitBugs.isNotEmpty()) {
+                    for (b in hitBugs) {
+                        viewModel.hitBug(b.points)
+                    }
+                    Toast.makeText(this@MainActivity, "⚡ Мультитач поразил ${hitBugs.size} жуков!", Toast.LENGTH_SHORT).show()
+                    updateGameHeader()
+                }
+            }
+        }
+    }
+
+    private fun updateGameSkillsSpinner() {
+        val spinner = findViewById<Spinner?>(R.id.spinnerGameSkills)
+        val buttonActivate = findViewById<Button?>(R.id.buttonActivateSkill)
+        availableSkills = viewModel.getOwnedSkills()
+
+        if (availableSkills.isEmpty()) {
+            val emptyAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("УМЕНИЙ НЕТ"))
+            spinner?.adapter = emptyAdapter
+            buttonActivate?.isEnabled = false
+            viewModel.selectedSkill = null
+        } else {
+            val items = availableSkills.map { "${it.icon} ${it.title} (зарядов: ${viewModel.getChargesForSkill(it)})" }
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, items)
+            spinner?.adapter = adapter
+            buttonActivate?.isEnabled = true
+            viewModel.selectedSkill = availableSkills.firstOrNull()
+        }
+    }
+
+    private fun setupShop() {
+        findViewById<Button>(R.id.buttonBuyFreeze).setOnClickListener { buySkill(SkillType.FREEZE) }
+        findViewById<Button>(R.id.buttonBuyBomb).setOnClickListener { buySkill(SkillType.BOMB) }
+        findViewById<Button>(R.id.buttonBuySlow).setOnClickListener { buySkill(SkillType.SLOW) }
+        findViewById<Button>(R.id.buttonBuyMultitouch).setOnClickListener { buySkill(SkillType.MULTITOUCH) }
+    }
+
+    private fun buySkill(skill: SkillType) {
+        lifecycleScope.launch {
+            val res = viewModel.buySkill(skill)
+            if (res.isSuccess) {
+                Toast.makeText(this@MainActivity, "Успешно куплено: ${skill.title} (+3 заряда)!", Toast.LENGTH_SHORT).show()
+                updateShopUI()
+                updateGameSkillsSpinner()
+                updateGameHeader()
+            } else {
+                Toast.makeText(this@MainActivity, res.exceptionOrNull()?.message ?: "Ошибка покупки", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun updateShopUI() {
+        findViewById<TextView?>(R.id.textShopPlayerName)?.text = "Игрок: ${viewModel.currentUserName}"
+        findViewById<TextView?>(R.id.textShopBalance)?.text = "Баланс: ${viewModel.currentPlayerCoins} монет"
+
+        findViewById<TextView?>(R.id.textChargesFreeze)?.text = "В наличии: ${viewModel.freezeCharges} зарядов"
+        findViewById<TextView?>(R.id.textChargesBomb)?.text = "В наличии: ${viewModel.bombCharges} зарядов"
+        findViewById<TextView?>(R.id.textChargesSlow)?.text = "В наличии: ${viewModel.slowCharges} зарядов"
+        findViewById<TextView?>(R.id.textChargesMultitouch)?.text = "В наличии: ${viewModel.multitouchCharges} зарядов"
     }
 
     private fun onGameOver() {
@@ -301,6 +420,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         viewModel.gameEngine.bugs.clear()
         viewModel.gameEngine.bonus = null
         viewModel.gameEngine.isTiltModeActive = false
+        viewModel.gameEngine.isFrozen = false
+        viewModel.gameEngine.isSlowed = false
+        viewModel.gameEngine.isMultitouchActive = false
         val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
         gameView?.bonus = null
@@ -309,8 +431,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
         findViewById<TextView?>(R.id.textViewScore)?.text = "Игра окончена! Очки: ${viewModel.score}"
 
+        val coinsEarned = viewModel.earnedCoinsThisRound
+
         lifecycleScope.launch {
             viewModel.saveCurrentGameSession()
+            updateShopUI()
+            updateGameHeader()
         }
 
         val message = """
@@ -318,6 +444,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             
             Игрок: ${viewModel.currentUserName}
             Итоговые очки: ${viewModel.score}
+            Получено монет: +$coinsEarned
+            Использовано умение: ${viewModel.usedSkillTitle}
             Сложность: ${viewModel.difficultyName}
             Попадания: ${viewModel.hits}
             Промахи: ${viewModel.misses}
@@ -394,14 +522,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 return@launch
             }
 
-            val userNames = players.map { "${it.name} (${it.zodiac})" }.toTypedArray()
+            val userNames = players.map { "${it.name} (монет: ${it.coins})" }.toTypedArray()
             AlertDialog.Builder(this@MainActivity)
                 .setTitle("Выберите игрока")
                 .setItems(userNames) { _, which ->
                     val selectedUser = players[which]
-                    viewModel.currentUserName = selectedUser.name
-                    viewModel.currentUserZodiac = selectedUser.zodiac
+                    viewModel.syncPlayer(selectedUser)
                     updateGameHeader()
+                    updateShopUI()
+                    updateGameSkillsSpinner()
                     Toast.makeText(this@MainActivity, "Текущий игрок: ${selectedUser.name}", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("Отмена", null)
@@ -412,9 +541,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private fun registerUser(name: String, zodiac: String) {
         lifecycleScope.launch {
             val player = viewModel.registerOrGetPlayer(name, zodiac)
-            viewModel.currentUserName = player.name
-            viewModel.currentUserZodiac = player.zodiac
             updateGameHeader()
+            updateShopUI()
+            updateGameSkillsSpinner()
             Toast.makeText(this@MainActivity, "Игрок '${player.name}' активирован!", Toast.LENGTH_SHORT).show()
         }
     }
@@ -465,7 +594,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     abs(diffX) > SWIPE_THRESHOLD &&
                     abs(velocityX) > SWIPE_VELOCITY_THRESHOLD
                 ) {
-                    val tabsCount = 6
+                    val tabsCount = 7
 
                     if (tabHost.currentTab == 4 && viewModel.isGameRunning) {
                         return false
@@ -551,6 +680,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         stopBugScream()
         findViewById<Button?>(R.id.buttonStart)?.visibility = View.VISIBLE
         updateGameHeader()
+        updateGameSkillsSpinner()
 
         val gameView = findViewById<GameView?>(R.id.gameView)
         gameView?.bugs = emptyList()
