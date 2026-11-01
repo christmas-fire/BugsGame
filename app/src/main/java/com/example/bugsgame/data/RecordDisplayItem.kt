@@ -9,7 +9,9 @@ data class RecordDisplayItem(
     val hits: Int,
     val misses: Int,
     val durationSeconds: Int,
-    val finishedAtEpochMillis: Long
+    val finishedAtEpochMillis: Long,
+    val usedSkill: String,
+    val coinsEarned: Int
 ) {
     val accuracy: Float
         get() {
