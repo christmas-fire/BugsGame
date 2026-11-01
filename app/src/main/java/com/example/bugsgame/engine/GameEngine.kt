@@ -20,10 +20,20 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
     var tiltModeEndTime: Long = 0L
     var tiltX: Float = 0f
     var tiltY: Float = 0f
+    var bonusIntervalSeconds: Int = 15
     private var lastBonusSpawnTime: Long = 0L
 
     var goldPrice: Double = 7500.0
     private var lastGoldenBugSpawnTime: Long = 0L
+
+    var isFrozen: Boolean = false
+    var freezeEndTime: Long = 0L
+
+    var isSlowed: Boolean = false
+    var slowEndTime: Long = 0L
+
+    var isMultitouchActive: Boolean = false
+    var multitouchEndTime: Long = 0L
 
     fun updateSize(newWidth: Int, newHeight: Int, newTopOffset: Int = 0) {
         if (newWidth > 0 && newHeight > 0) {
@@ -35,21 +45,48 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
 
     fun startGame(viewModel: GameViewModel) {
         this.maxBugs = viewModel.maxBugs
+        this.bonusIntervalSeconds = viewModel.bonusInterval
         this.bugs.clear()
         this.bonus = null
         this.isTiltModeActive = false
+        this.isFrozen = false
+        this.isSlowed = false
+        this.isMultitouchActive = false
         this.lastBonusSpawnTime = System.currentTimeMillis()
         this.lastGoldenBugSpawnTime = System.currentTimeMillis()
+    }
+
+    fun applyFreeze(durationMs: Long = 5000L) {
+        isFrozen = true
+        freezeEndTime = System.currentTimeMillis() + durationMs
+    }
+
+    fun applySlow(durationMs: Long = 7000L) {
+        isSlowed = true
+        slowEndTime = System.currentTimeMillis() + durationMs
+    }
+
+    fun applyMultitouch(durationMs: Long = 8000L) {
+        isMultitouchActive = true
+        multitouchEndTime = System.currentTimeMillis() + durationMs
+    }
+
+    fun triggerBomb(): List<Bug> {
+        val destroyed = ArrayList(bugs)
+        bugs.clear()
+        return destroyed
     }
 
     fun updateBugs(gameSpeedMultiplier: Float) {
         val now = System.currentTimeMillis()
 
-        if (isTiltModeActive && now > tiltModeEndTime) {
-            isTiltModeActive = false
-        }
+        if (isTiltModeActive && now > tiltModeEndTime) isTiltModeActive = false
+        if (isFrozen && now > freezeEndTime) isFrozen = false
+        if (isSlowed && now > slowEndTime) isSlowed = false
+        if (isMultitouchActive && now > multitouchEndTime) isMultitouchActive = false
 
-        if (bonus == null && now - lastBonusSpawnTime >= 15000L) {
+        val intervalMs = (bonusIntervalSeconds.coerceAtLeast(1)) * 1000L
+        if (bonus == null && now - lastBonusSpawnTime >= intervalMs) {
             spawnBonus()
             lastBonusSpawnTime = now
         }
@@ -59,14 +96,17 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
             lastGoldenBugSpawnTime = now
         }
 
+        if (isFrozen) return
+
+        val slowFactor = if (isSlowed) 0.4f else 1.0f
 
         for (bug in bugs) {
             if (isTiltModeActive) {
-                val gravityForce = 4.5f * gameSpeedMultiplier
+                val gravityForce = 4.5f * gameSpeedMultiplier * slowFactor
                 bug.x += (bug.dx * 0.8f) + (tiltX * gravityForce)
                 bug.y += (bug.dy * 0.8f) + (tiltY * gravityForce)
             } else {
-                val totalSpeed = bug.speed * gameSpeedMultiplier
+                val totalSpeed = bug.speed * gameSpeedMultiplier * slowFactor
                 bug.x += bug.dx * totalSpeed
                 bug.y += bug.dy * totalSpeed
             }
@@ -153,6 +193,27 @@ class GameEngine(var width: Int = 1000, var height: Int = 1000) {
             }
         }
         return null
+    }
+
+    fun checkMultiHit(touches: List<Pair<Float, Float>>): List<Bug> {
+        val hitBugs = mutableListOf<Bug>()
+        val aoeRadius = 140f
+
+        for (i in bugs.indices.reversed()) {
+            val bug = bugs[i]
+            val bugCenterX = bug.x + bug.size / 2f
+            val bugCenterY = bug.y + bug.size / 2f
+
+            val isTouched = touches.any { (tx, ty) ->
+                bug.contains(tx, ty) ||
+                        (kotlin.math.hypot((bugCenterX - tx).toDouble(), (bugCenterY - ty).toDouble()) <= aoeRadius)
+            }
+
+            if (isTouched) {
+                hitBugs.add(bugs.removeAt(i))
+            }
+        }
+        return hitBugs
     }
 
     private fun spawnGoldenBug() {

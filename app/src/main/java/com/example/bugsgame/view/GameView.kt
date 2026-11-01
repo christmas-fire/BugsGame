@@ -21,9 +21,7 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
     private val dstRect = RectF()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val bonusBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFD700")
-    }
+    private val bonusBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD700") }
     private val bonusStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#FF6F00")
         style = Paint.Style.STROKE
@@ -35,6 +33,9 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
+
+    private val freezeOverlayPaint = Paint().apply { color = Color.parseColor("#3300E5FF") }
+    private val slowOverlayPaint = Paint().apply { color = Color.parseColor("#22FF9800") }
 
     private val fallbackBitmap: Bitmap by lazy {
         loadBitmapFromDrawable(R.drawable.bug) ?: Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply {
@@ -74,10 +75,21 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
 
     var bugs: List<Bug> = emptyList()
     var bonus: Bonus? = null
+    var isFrozen: Boolean = false
+    var isSlowed: Boolean = false
+    var isMultitouchActive: Boolean = false
+
     var onBugClick: ((x: Float, y: Float) -> Boolean)? = null
+    var onMultiTouchClick: ((touches: List<Pair<Float, Float>>) -> Unit)? = null
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+
+        if (isFrozen) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), freezeOverlayPaint)
+        } else if (isSlowed) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), slowOverlayPaint)
+        }
 
         for (bug in bugs) {
             if (bug.type == BugType.GOLDEN) {
@@ -121,9 +133,21 @@ class GameView(context: Context, attrs: AttributeSet) : View(context, attrs) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN) {
-            onBugClick?.invoke(event.x, event.y)
-            return true
+        val action = event.actionMasked
+
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+            if (isMultitouchActive) {
+                val touches = mutableListOf<Pair<Float, Float>>()
+                for (i in 0 until event.pointerCount) {
+                    touches.add(Pair(event.getX(i), event.getY(i)))
+                }
+                onMultiTouchClick?.invoke(touches)
+                return true
+            } else {
+                val pointerIndex = event.actionIndex
+                onBugClick?.invoke(event.getX(pointerIndex), event.getY(pointerIndex))
+                return true
+            }
         }
         return super.onTouchEvent(event)
     }
