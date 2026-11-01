@@ -19,7 +19,9 @@ interface GameSessionDao {
             s.hits AS hits,
             s.misses AS misses,
             s.durationSeconds AS durationSeconds,
-            s.finishedAtEpochMillis AS finishedAtEpochMillis
+            s.finishedAtEpochMillis AS finishedAtEpochMillis,
+            s.usedSkill AS usedSkill,
+            s.coinsEarned AS coinsEarned
         FROM game_sessions s
         INNER JOIN players p ON s.playerId = p.id
         WHERE (:playerId IS NULL OR s.playerId = :playerId)
@@ -41,7 +43,9 @@ interface GameSessionDao {
             s.hits AS hits,
             s.misses AS misses,
             s.durationSeconds AS durationSeconds,
-            s.finishedAtEpochMillis AS finishedAtEpochMillis
+            s.finishedAtEpochMillis AS finishedAtEpochMillis,
+            s.usedSkill AS usedSkill,
+            s.coinsEarned AS coinsEarned
         FROM game_sessions s
         INNER JOIN players p ON s.playerId = p.id
         WHERE (:playerId IS NULL OR s.playerId = :playerId)
