@@ -25,6 +25,8 @@ class RecordAdapter(context: Context, private val records: List<RecordDisplayIte
         val textScore = view.findViewById<TextView>(R.id.textRecordScore)
         val textDifficulty = view.findViewById<TextView>(R.id.textRecordDifficulty)
         val textAccuracy = view.findViewById<TextView>(R.id.textRecordAccuracy)
+        val textSkill = view.findViewById<TextView>(R.id.textRecordSkill)
+        val textCoins = view.findViewById<TextView>(R.id.textRecordCoins)
         val textDate = view.findViewById<TextView>(R.id.textRecordDate)
 
         val zodiacSuffix = if (record.playerZodiac.isNotBlank()) " (${record.playerZodiac})" else ""
@@ -32,6 +34,9 @@ class RecordAdapter(context: Context, private val records: List<RecordDisplayIte
         textScore.text = "${record.score} очк."
         textDifficulty.text = "Сложность: ${record.difficulty}"
         textAccuracy.text = String.format(Locale.getDefault(), "Точность: %.1f%%", record.accuracy)
+
+        textSkill.text = "Умение: ${record.usedSkill}"
+        textCoins.text = "+${record.coinsEarned} монет"
 
         textDate.text = dateFormat.format(Date(record.finishedAtEpochMillis))
 

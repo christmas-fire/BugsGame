@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tabShop"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Магазин способностей"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#FFF8E1"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:id="@+id/textShopPlayerName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Игрок: Гость"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#3E2723" />
+
+            <TextView
+                android:id="@+id/textShopBalance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Баланс: 0 монет"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#FF8F00"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="За каждые 100 очков в игре начисляется 10 монет"
+                android:textSize="12sp"
+                android:textColor="#795548"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#E1F5FE"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Заморозка"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#0277BD" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Останавливает всех насекомых на экране на 5 секунд"
+                android:textSize="13sp"
+                android:textColor="#546E7A" />
+
+            <TextView
+                android:id="@+id/textChargesFreeze"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="В наличии: 0 зарядов"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#01579B"
+                android:layout_marginTop="4dp" />
+
+            <Button
+                android:id="@+id/buttonBuyFreeze"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Купить за 550 монет (+3 заряда)"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#FFEBEE"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Бомба"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#C62828" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Мгновенный взрыв уничтожает всех жуков на поле с начислением очков"
+                android:textSize="13sp"
+                android:textColor="#546E7A" />
+
+            <TextView
+                android:id="@+id/textChargesBomb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="В наличии: 0 зарядов"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#B71C1C"
+                android:layout_marginTop="4dp" />
+
+            <Button
+                android:id="@+id/buttonBuyBomb"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Купить за 550 монет (+3 заряда)"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#FFF3E0"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Замедление"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#EF6C00" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Снижает скорость всех жуков в 2.5 раза на 7 секунд"
+                android:textSize="13sp"
+                android:textColor="#546E7A" />
+
+            <TextView
+                android:id="@+id/textChargesSlow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="В наличии: 0 зарядов"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#E65100"
+                android:layout_marginTop="4dp" />
+
+            <Button
+                android:id="@+id/buttonBuySlow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Купить за 550 монет (+3 заряда)"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#F3E5F5"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Мультитач-удар"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#7B1FA2" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ловите жуков несколькими пальцами сразу с расширенной областью удара"
+                android:textSize="13sp"
+                android:textColor="#546E7A" />
+
+            <TextView
+                android:id="@+id/textChargesMultitouch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="В наличии: 0 зарядов"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#4A148C"
+                android:layout_marginTop="4dp" />
+
+            <Button
+                android:id="@+id/buttonBuyMultitouch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Купить за 550 монет (+3 заряда)"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
